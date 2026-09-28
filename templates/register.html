@@ -1,18 +1,20 @@
 {% extends "base.html" %}
+{% from "_macros.html" import plate_fields %}
 {% block title %}Registracija{% endblock %}
 {% block content %}
 <img class="brand" src="{{ url_for('static', filename='finbee-logo.svg') }}" alt="finbee">
 <p class="eyebrow">Registracija</p>
 <h1>Sveiki!</h1>
-<p class="muted">{{ email }} – dar du dalykai ir galėsite rezervuoti.</p>
+<p class="muted">{{ email }} – dar keli dalykai ir galėsite rezervuoti.</p>
 <form class="card" method="post" action="{{ url_for('register') }}">
   <label class="field"><span>Vardas ir pavardė</span>
-    <input name="name" autocomplete="name" value="{{ form.get('name', '') }}" required autofocus>
+    <input name="name" autocomplete="name" value="{{ form.name }}" required autofocus>
   </label>
-  <label class="field"><span>Automobilio valstybinis numeris (keli – per kablelį)</span>
-    <input name="plates" autocapitalize="characters" placeholder="ABC 123" value="{{ form.get('plates', '') }}">
+  <label class="field"><span>Telefono numeris</span>
+    <input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+370 612 34567" value="{{ form.phone }}" required>
   </label>
-  <p class="small muted">Numeris padeda kolegoms išsiaiškinti, kieno automobilis stovi vietoje.</p>
+  {{ plate_fields(form.plates) }}
+  <p class="small muted">Kolegos, ieškantys, kieno automobilis stovi vietoje, pagal numerį matys jūsų vardą ir galės jums paskambinti.</p>
   <button class="btn btn-primary btn-block">Pradėti</button>
 </form>
 {% endblock %}

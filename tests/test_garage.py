@@ -1,4 +1,6 @@
+import sqlite3
 import sys
+import tempfile
 import unittest
 from datetime import date, datetime
 from pathlib import Path
@@ -587,7 +589,7 @@ class HistoryTest(GarageTest):
 class NumberPlateTest(GarageTest):
     def test_anyone_can_look_up_whose_car_a_plate_belongs_to_however_it_is_typed(self):
         self.garage.register("ona@finbeeverslui.lt", "Ona", ["abc 123"])
-        self.assertEqual((self.garage.whose_plate("ABC-123"), self.garage.whose_plate("XYZ 999")),
+        self.assertEqual((self.garage.whose_plate("ABC-123").name, self.garage.whose_plate("XYZ 999")),
                          ("Ona", None))
 
     def test_a_colleague_can_change_their_plates(self):
@@ -595,6 +597,50 @@ class NumberPlateTest(GarageTest):
         self.garage.set_plates(ona, ["KLM 456"])
         self.assertEqual((self.garage.whose_plate("ABC123"), self.garage.plates(ona)),
                          (None, ["KLM456"]))
+
+
+class PhoneNumberTest(GarageTest):
+    def test_looking_up_a_plate_gives_the_drivers_phone_number_to_call(self):
+        self.garage.register("ona@finbeeverslui.lt", "Ona", ["ABC 123"], phone="8 612 34567")
+        self.assertEqual(self.garage.whose_plate("abc123").phone, "+37061234567")
+
+    def test_a_phone_number_is_stored_the_same_however_it_is_typed(self):
+        ona = self.colleague("Ona")
+        stored = []
+        for typed in ("+370 612 34567", "861234567", "8 (612) 34-567", "0037061234567", "61234567",
+                      "+371 2123 4567"):
+            self.garage.set_phone(ona, typed)
+            stored.append(self.garage.colleague(ona.id).phone)
+        self.assertEqual(stored, ["+37061234567"] * 5 + ["+37121234567"])
+
+    def test_a_number_that_is_not_a_phone_number_is_refused(self):
+        ona = self.colleague("Ona")
+        codes = []
+        for typed in ("", "12345", "+370 612 3456", "+370 612 345678", "ABC 123"):
+            try:
+                self.garage.set_phone(ona, typed)
+            except Refused as error:
+                codes.append(error.code)
+        self.assertEqual((codes, self.garage.colleague(ona.id).phone), (["bad_phone"] * 5, None))
+
+    def test_registering_with_a_number_that_is_not_a_phone_number_is_refused(self):
+        with self.assertRaises(Refused):
+            self.garage.register("ona@finbeeverslui.lt", "Ona", [], phone="12345")
+        self.assertIsNone(self.garage.colleague_by_email("ona@finbeeverslui.lt"))
+
+    def test_a_garage_from_before_phone_numbers_keeps_its_colleagues_and_takes_numbers(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = str(Path(folder) / "parking.sqlite3")
+            old = sqlite3.connect(path)
+            old.executescript(
+                "CREATE TABLE colleagues (id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT NULL, "
+                "name TEXT NOT NULL, is_admin INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1);"
+                "INSERT INTO colleagues (email, name) VALUES ('ona@finbeeverslui.lt', 'Ona');")
+            old.close()
+            garage = Garage(path, now=self.clock)
+            ona = garage.colleague_by_email("ona@finbeeverslui.lt")
+            garage.set_phone(ona, "861234567")
+            self.assertEqual((ona.phone, garage.colleague(ona.id).phone), (None, "+37061234567"))
 
 
 class ClosedDayTest(GarageTest):

@@ -15,12 +15,24 @@
     sync();
   });
 
-  // Notifications on this device (the profile page).
-  var button = document.getElementById('enable-push');
-  var status = document.getElementById('push-status');
-  if (!button || !status) return;
+  // Number Plates: one field each; "+ Pridėti dar vieną numerį" adds another.
+  document.querySelectorAll('[data-plates]').forEach(function (set) {
+    var add = set.querySelector('[data-add-plate]');
+    add.hidden = false;
+    add.addEventListener('click', function () {
+      var fields = set.querySelectorAll('input[name=plates]');
+      var field = fields[fields.length - 1].cloneNode();
+      field.value = '';
+      add.before(field);
+      field.focus();
+    });
+  });
+})();
+
+// Notifications on this device: the profile page's switch, and the banner at the top of the
+// other pages that asks for them.
+(function () {
   var supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-  function say(text) { status.textContent = text; }
   function keyBytes(b64) {
     var s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - b64.length % 4) % 4));
     return Uint8Array.from(s, function (c) { return c.charCodeAt(0); });
@@ -29,40 +41,85 @@
     return fetch('/api/push', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(subscription.toJSON())
+    }).then(function (response) {
+      if (!response.ok) throw new Error('HTTP ' + response.status);
     });
   }
+  // 'on', 'off' or 'blocked'. Never settles where no service worker becomes ready.
+  function state() {
+    return navigator.serviceWorker.ready.then(function (reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function (existing) {
+      if (existing && Notification.permission === 'granted') {
+        send(existing).catch(function () {});  // keeps the server's copy fresh
+        return 'on';
+      }
+      return Notification.permission === 'denied' ? 'blocked' : 'off';
+    });
+  }
+  // Must run from a tap: Safari only asks for permission then.
+  function enable(key) {
+    return Notification.requestPermission().then(function (permission) {
+      if (permission !== 'granted') return permission === 'denied' ? 'blocked' : 'off';
+      return navigator.serviceWorker.ready.then(function (reg) {
+        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+      }).then(send).then(function () { return 'on'; });
+    });
+  }
+
+  var button = document.getElementById('enable-push');
+  var status = document.getElementById('push-status');
+  if (button && status) {
+    var words = {
+      on: 'Pranešimai šiame įrenginyje įjungti.',
+      off: 'Pranešimai šiame įrenginyje neįjungti.',
+      blocked: 'Pranešimai užblokuoti. Įjunkite juos telefono nustatymuose.'
+    };
+    var show = function (s) { status.textContent = words[s]; button.hidden = s !== 'off'; };
+    if (!supported) {
+      status.textContent = 'Šiame įrenginyje pranešimai neveikia. iPhone: pirmiausia pridėkite programėlę prie pradžios ekrano.';
+      button.hidden = true;
+    } else {
+      setTimeout(function () {  // no service worker ever became ready (blocked or failed)
+        if (status.textContent === 'Tikrinama…') status.textContent = 'Šiame įrenginyje pranešimai neveikia.';
+      }, 3000);
+      state().then(show);
+      button.addEventListener('click', function () {
+        enable(button.dataset.key).then(function (s) {
+          if (s === 'off') status.textContent = 'Leidimas nesuteiktas.'; else show(s);
+        }).catch(function (e) { status.textContent = 'Nepavyko įjungti: ' + e.message; });
+      });
+    }
+  }
+
+  var nudge = document.getElementById('push-nudge');
+  if (!nudge) return;
+  var reachable = nudge.dataset.reachable === 'yes';  // the server can push to them somewhere
+  var phone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  function offer(s) {  // shows the banner's part for that state; 'on' hides it
+    var any = false;
+    nudge.querySelectorAll('[data-when]').forEach(function (el) {
+      el.hidden = el.dataset.when !== s;
+      any = any || !el.hidden;
+    });
+    nudge.hidden = !any;
+  }
+  if (reachable && !phone) return;  // a computer, while notifications already reach them elsewhere
   if (!supported) {
-    say('Šiame įrenginyje pranešimai neveikia. iPhone: pirmiausia pridėkite programėlę prie pradžios ekrano.');
-    button.hidden = true;
+    if (/iPhone|iPod/.test(navigator.userAgent) && !standalone && !reachable) offer('install');
     return;
   }
-  setTimeout(function () {  // no service worker ever became ready (blocked or failed)
-    if (status.textContent === 'Tikrinama…') say('Šiame įrenginyje pranešimai neveikia.');
-  }, 3000);
-  navigator.serviceWorker.ready.then(function (reg) {
-    return reg.pushManager.getSubscription().then(function (existing) {
-      if (existing && Notification.permission === 'granted') {
-        send(existing);  // keeps the server's copy fresh
-        say('Pranešimai šiame įrenginyje įjungti.');
-        button.hidden = true;
-      } else if (Notification.permission === 'denied') {
-        say('Pranešimai užblokuoti. Įjunkite juos telefono nustatymuose.');
-        button.hidden = true;
-      } else {
-        say('Pranešimai šiame įrenginyje neįjungti.');
-      }
-    });
-  });
-  button.addEventListener('click', function () {
-    Notification.requestPermission().then(function (permission) {
-      if (permission !== 'granted') { say('Leidimas nesuteiktas.'); return; }
-      return navigator.serviceWorker.ready.then(function (reg) {
-        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(button.dataset.key) });
-      }).then(send).then(function () {
-        say('Pranešimai šiame įrenginyje įjungti.');
-        button.hidden = true;
-      });
-    }).catch(function (e) { say('Nepavyko įjungti: ' + e.message); });
+  state().then(offer);
+  var enableButton = nudge.querySelector('[data-enable]');
+  var error = nudge.querySelector('[data-error]');
+  enableButton.addEventListener('click', function () {
+    enableButton.disabled = true;
+    error.hidden = true;
+    enable(enableButton.dataset.key).then(offer, function (e) {
+      error.textContent = 'Nepavyko įjungti: ' + e.message;
+      error.hidden = false;
+    }).then(function () { enableButton.disabled = false; });
   });
 })();
 

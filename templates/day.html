@@ -85,7 +85,18 @@
     <button class="btn" style="flex: 0 0 auto">Ieškoti</button>
   </div>
   {% if plate %}
-    <p>{% if plate_owner %}<b>{{ plate_owner }}</b>{% else %}<span class="muted">Tokio numerio nėra.</span>{% endif %}</p>
+    {% if plate_owner %}
+    <div class="plate-owner">
+      <b>{{ plate_owner.name }}</b>
+      {% if plate_owner.phone %}
+      <a class="btn btn-primary call" href="tel:{{ plate_owner.phone }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 3.5h3l1.5 4-2 1.5a11 11 0 0 0 7 7l1.5-2 4 1.5v3a2 2 0 0 1-2 2A17 17 0 0 1 3.5 5.5a2 2 0 0 1 2-2z"/></svg>{{ lt.phone(plate_owner.phone) }}</a>
+      {% else %}
+      <span class="small muted">Telefono numerio dar nepateikė.</span>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="muted">Tokio numerio nėra.</p>
+    {% endif %}
   {% endif %}
 </form>
 {% endblock %}

@@ -56,6 +56,7 @@ MESSAGES = {
     "expired": "Kodas nebegalioja – paprašykite naujo.",
     "too_many_tries": "Per daug bandymų – paprašykite naujo kodo.",
     "too_soon": "Kodą ką tik išsiuntėme – palaukite minutę ir bandykite vėl.",
+    "bad_phone": "Įrašykite telefono numerį, pvz., +370 612 34567.",
 }
 CODE_EMAIL = ("Jūsų parkavimo programėlės prisijungimo kodas: %s\n\n"
               "Kodas galioja 10 minučių. Jei jo neprašėte, šį laišką tiesiog ištrinkite.\n")
@@ -108,11 +109,17 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
     def refused(error):
         flash(MESSAGES.get(error.code, "Nepavyko (%s)." % error.code), "error")
 
+    def needs_phone():
+        """A Colleague from before Phone Numbers gives theirs before seeing any other page."""
+        return g.me.phone is None and request.method == "GET" and request.endpoint != "add_phone"
+
     def signed_in(view):
         @wraps(view)
         def wrapper(*args, **kwargs):
             if g.me is None:
                 return redirect(url_for("start"))
+            if needs_phone():
+                return redirect(url_for("add_phone"))
             return view(*args, **kwargs)
         return wrapper
 
@@ -121,6 +128,8 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         def wrapper(*args, **kwargs):
             if g.me is None:
                 return redirect(url_for("start"))
+            if needs_phone():
+                return redirect(url_for("add_phone"))
             if not g.me.is_admin:
                 abort(403)
             return view(*args, **kwargs)
@@ -137,6 +146,11 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         if form.get("kind") == "part":
             return form.get("start") or "", form.get("end") or ""
         return None, None
+
+    def plate_list(form):
+        """Every Number Plate typed, one per field; a comma, semicolon or "ir" also separates them."""
+        return [plate for value in form.getlist("plates")
+                for plate in re.split(r"[,;/\n]|\s+ir\s+", value, flags=re.IGNORECASE) if plate.strip()]
 
     def back(default):
         target = request.form.get("next") or ""
@@ -212,7 +226,9 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
 
     @app.context_processor
     def template_helpers():
-        return {"me": g.get("me"), "lt": lt, "day_label_short": day_label_short,
+        me = g.get("me")
+        return {"me": me, "has_push": bool(me and garage.push_subscriptions(me.id)),
+                "lt": lt, "day_label_short": day_label_short,
                 "position": position, "vapid_public": vapid_public, "today": now().date(),
                 "now_hhmm": now().strftime("%H:%M")}
 
@@ -313,17 +329,35 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         email = session.get("verified_email")
         if not email:
             return redirect(url_for("start"))
+        form = {"name": request.form.get("name", "").strip(), "phone": request.form.get("phone", "").strip(),
+                "plates": request.form.getlist("plates")}
         if request.method == "POST":
-            name = request.form.get("name", "").strip()
-            plates = [p for p in request.form.get("plates", "").replace(";", ",").split(",") if p.strip()]
-            if not name:
+            if not form["name"]:
                 flash("Įrašykite vardą ir pavardę.", "error")
-                return render_template("register.html", email=email, form=request.form)
-            colleague = garage.colleague_by_email(email) or garage.register(email, name, plates)
+                return render_template("register.html", email=email, form=form)
+            try:
+                colleague = garage.colleague_by_email(email) or garage.register(
+                    email, form["name"], plate_list(request.form), phone=form["phone"])
+            except Refused as error:
+                refused(error)
+                return render_template("register.html", email=email, form=form)
             session.pop("verified_email", None)
             session["colleague_id"] = colleague.id
             return redirect(url_for("today_page"))
-        return render_template("register.html", email=email, form={})
+        return render_template("register.html", email=email, form=form)
+
+    @app.route("/telefonas", methods=["GET", "POST"])
+    @signed_in
+    def add_phone():
+        """The one extra step for a Colleague who registered before Phone Numbers."""
+        if request.method == "POST":
+            try:
+                garage.set_phone(g.me, request.form.get("phone", ""))
+            except Refused as error:
+                refused(error)
+                return render_template("phone.html", phone=request.form.get("phone", ""))
+            return redirect(url_for("today_page"))
+        return render_template("phone.html", phone="")
 
     @app.post("/atsijungti")
     def sign_out():
@@ -438,11 +472,16 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
     @signed_in
     def profile():
         if request.method == "POST":
-            plates = [p for p in request.form.get("plates", "").replace(";", ",").split(",") if p.strip()]
-            garage.set_plates(g.me, plates)
-            flash("Valstybiniai numeriai išsaugoti.")
+            try:
+                garage.set_phone(g.me, request.form.get("phone", ""))
+            except Refused as error:
+                refused(error)
+                return render_template("profile.html", phone=request.form.get("phone", ""),
+                                       plates=request.form.getlist("plates"))
+            garage.set_plates(g.me, plate_list(request.form))
+            flash("Išsaugota.")
             return redirect(url_for("profile"))
-        return render_template("profile.html", plates=", ".join(garage.plates(g.me)))
+        return render_template("profile.html", phone=lt.phone(g.me.phone), plates=garage.plates(g.me))
 
     # ---- administration --------------------------------------------------------------------
 

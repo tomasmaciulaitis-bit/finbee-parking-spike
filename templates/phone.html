@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% set hide_push_nudge = True %}
+{% block title %}Telefono numeris{% endblock %}
+{% block content %}
+<p class="eyebrow">Dar vienas dalykas</p>
+<h1>Įveskite telefono numerį</h1>
+<p class="muted">Kolegos, ieškantys, kieno automobilis stovi vietoje, pagal numerį matys jūsų vardą ir galės jums paskambinti.</p>
+<form class="card" method="post" action="{{ url_for('add_phone') }}">
+  <label class="field"><span>Telefono numeris</span>
+    <input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+370 612 34567" value="{{ phone }}" required autofocus>
+  </label>
+  <button class="btn btn-primary btn-block">Išsaugoti</button>
+</form>
+{% endblock %}

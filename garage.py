@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS colleagues (
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     is_admin INTEGER NOT NULL DEFAULT 0,
-    active INTEGER NOT NULL DEFAULT 1
+    active INTEGER NOT NULL DEFAULT 1,
+    phone TEXT
 );
 CREATE TABLE IF NOT EXISTS plates (
     colleague_id INTEGER NOT NULL REFERENCES colleagues(id),
@@ -125,6 +126,28 @@ def normal_plate(text):
     return "".join(ch for ch in text.upper() if ch.isalnum())
 
 
+def normal_phone(text):
+    """'+370 612 34567', '8 612 34567' and '0037061234567' are the same Phone Number,
+    '+37061234567'. None when the text isn't a phone number."""
+    text = (text or "").strip()
+    if not text or "+" in text[1:] or any(ch not in "0123456789+ -()." for ch in text):
+        return None
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if text.startswith("+"):
+        number = "+" + digits
+    elif digits.startswith("00"):
+        number = "+" + digits[2:]
+    elif len(digits) == 9 and digits.startswith("8"):
+        number = "+370" + digits[1:]
+    elif len(digits) == 8 and digits.startswith("6"):
+        number = "+370" + digits
+    else:
+        return None
+    if number.startswith("+370"):
+        return number if len(number) == 12 else None
+    return number if 9 <= len(number) <= 16 else None
+
+
 def number_order(number):
     return (0, int(number), "") if number.isdigit() else (1, 0, number)
 
@@ -151,6 +174,7 @@ class Colleague:
     name: str
     is_admin: bool = False
     active: bool = True
+    phone: object = None    # '+37061234567'; None only for a Colleague from before Phone Numbers
 
 
 @dataclass(frozen=True)
@@ -267,6 +291,7 @@ class ColleagueInfo:
     is_admin: bool
     active: bool
     plates: list
+    phone: object
 
 
 @dataclass(frozen=True)
@@ -303,6 +328,9 @@ class Garage:
         self._db = sqlite3.connect(db_path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(SCHEMA)
+        if "phone" not in {row["name"] for row in self._db.execute("PRAGMA table_info(colleagues)")}:
+            with self._db:  # a garage from before Phone Numbers
+                self._db.execute("ALTER TABLE colleagues ADD COLUMN phone TEXT")
         with self._db:
             self._db.execute(
                 "INSERT OR IGNORE INTO rules (id, window_days, opening_min, hours_start_min, "
@@ -312,12 +340,16 @@ class Garage:
         self._first_admin_email = first_admin_email
         self._lock = threading.RLock()
 
-    def register(self, email, name, plates):
+    def register(self, email, name, plates, phone=None):
+        """`phone` is required on the Registration page; None is left for older callers."""
+        number = normal_phone(phone) if phone is not None else None
+        if phone is not None and number is None:
+            raise Refused("bad_phone")
         email = email.strip().lower()
         with self._lock, self._db:
             cur = self._db.execute(
-                "INSERT INTO colleagues (email, name, is_admin) VALUES (?, ?, ?)",
-                (email, name.strip(), int(email == (self._first_admin_email or "").lower())))
+                "INSERT INTO colleagues (email, name, is_admin, phone) VALUES (?, ?, ?, ?)",
+                (email, name.strip(), int(email == (self._first_admin_email or "").lower()), number))
             self._store_plates(cur.lastrowid, plates)
             return self._colleague("id", cur.lastrowid)
 
@@ -332,7 +364,7 @@ class Garage:
     def _colleague(self, column, value):
         row = self._db.execute("SELECT * FROM colleagues WHERE %s = ?" % column, (value,)).fetchone()
         return row and Colleague(row["id"], row["email"], row["name"], bool(row["is_admin"]),
-                                 bool(row["active"]))
+                                 bool(row["active"]), row["phone"])
 
     def set_plates(self, who, plates):
         with self._lock, self._db:
@@ -344,13 +376,21 @@ class Garage:
             return [row["plate"] for row in self._db.execute(
                 "SELECT plate FROM plates WHERE colleague_id = ? ORDER BY plate", (who.id,))]
 
+    def set_phone(self, who, phone):
+        number = normal_phone(phone)
+        if number is None:
+            raise Refused("bad_phone")
+        with self._lock, self._db:
+            self._db.execute("UPDATE colleagues SET phone = ? WHERE id = ?", (number, who.id))
+
     def whose_plate(self, plate):
-        """The name of the active Colleague who drives the car with this Number Plate, if any."""
+        """The active Colleague who drives the car with this Number Plate, if any: their name,
+        and their Phone Number to call them on."""
         with self._lock:
             row = self._db.execute(
-                "SELECT c.name FROM plates p JOIN colleagues c ON c.id = p.colleague_id "
+                "SELECT c.id FROM plates p JOIN colleagues c ON c.id = p.colleague_id "
                 "WHERE p.plate = ? AND c.active = 1", (normal_plate(plate),)).fetchone()
-            return row["name"] if row else None
+            return self._colleague("id", row["id"]) if row else None
 
     def _store_plates(self, colleague_id, plates):
         for plate in {normal_plate(plate) for plate in plates} - {""}:
@@ -657,7 +697,7 @@ class Garage:
             for row in self._db.execute("SELECT * FROM plates ORDER BY plate"):
                 plates.setdefault(row["colleague_id"], []).append(row["plate"])
             return [ColleagueInfo(row["id"], row["name"], row["email"], bool(row["is_admin"]),
-                                  bool(row["active"]), plates.get(row["id"], []))
+                                  bool(row["active"]), plates.get(row["id"], []), row["phone"])
                     for row in self._db.execute("SELECT * FROM colleagues ORDER BY active DESC, name")]
 
     def waiting_names(self, actor, day):

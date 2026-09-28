@@ -30,7 +30,7 @@ class AppTest(unittest.TestCase):
             send_push=lambda *args: None, send_email=lambda *args: None, background=False)
         self.app.testing = True
         self.garage = self.app.config["GARAGE"]
-        self.admin = self.garage.register("admin@finbeeverslui.lt", "Admin", [])
+        self.admin = self.garage.register("admin@finbeeverslui.lt", "Admin", [], phone="+370 600 00000")
         self.garage.add_space(self.admin, "12")
 
     def tearDown(self):
@@ -42,7 +42,7 @@ class AppTest(unittest.TestCase):
         code = [c for to, c in self.codes if to == email][-1]
         client.post("/prisijungti", data={"code": code})
         if name:
-            client.post("/registracija", data={"name": name, "plates": "ABC 123"})
+            client.post("/registracija", data={"name": name, "phone": "+370 612 34567", "plates": "ABC 123"})
         return client
 
     def test_a_colleague_signs_in_registers_and_books_through_the_pages(self):
@@ -90,6 +90,53 @@ class AppTest(unittest.TestCase):
         waiting = self.garage.my_bookings(self.garage.colleague_by_email("ona@finbeeverslui.lt")).waiting
         self.assertEqual(('action="/laukti"' in page, [(w.start, w.end) for w in waiting]),
                          (True, [("09:00", "12:00")]))
+
+    def verified(self, email):
+        """Signed in with a code, but not registered yet."""
+        client = self.app.test_client()
+        client.post("/kodas", data={"email": email})
+        client.post("/prisijungti", data={"code": [c for to, c in self.codes if to == email][-1]})
+        return client
+
+    def test_registering_needs_a_phone_number(self):
+        client = self.verified("ona@finbeeverslui.lt")
+        page = client.post("/registracija", data={"name": "Ona", "plates": "ABC 123"}).get_data(as_text=True)
+        without = self.garage.colleague_by_email("ona@finbeeverslui.lt")
+        client.post("/registracija", data={"name": "Ona", "phone": "8 612 34567", "plates": "ABC 123"})
+        ona = self.garage.colleague_by_email("ona@finbeeverslui.lt")
+        self.assertEqual((without, "telefono numerį" in page, ona.phone), (None, True, "+37061234567"))
+
+    def test_each_plate_field_is_its_own_number_plate(self):
+        client = self.verified("ona@finbeeverslui.lt")
+        client.post("/registracija", data={"name": "Ona", "phone": "861234567",
+                                           "plates": ["ABC 123", "DEF 456, GHI 789", "KLM 012 ir NOP 345", ""]})
+        ona = self.garage.colleague_by_email("ona@finbeeverslui.lt")
+        self.assertEqual(self.garage.plates(ona), ["ABC123", "DEF456", "GHI789", "KLM012", "NOP345"])
+
+    def test_a_plate_search_shows_the_drivers_phone_number_to_call(self):
+        self.garage.register("jonas@finbeeverslui.lt", "Jonas", ["KLM 456"], phone="8 699 11223")
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        page = client.get("/diena/2026-10-06?numeris=klm456").get_data(as_text=True)
+        self.assertEqual(('href="tel:+37069911223"' in page, "+370 699 11223" in page), (True, True))
+
+    def test_a_colleague_from_before_phone_numbers_gives_one_first(self):
+        self.garage.register("ona@finbeeverslui.lt", "Ona", ["ABC 123"])
+        client = self.signed_in("ona@finbeeverslui.lt")
+        first = client.get("/diena/2026-10-06")
+        client.post("/telefonas", data={"phone": "+370 612 34567"})
+        after = client.get("/diena/2026-10-06")
+        self.assertEqual((first.status_code, first.location.endswith("/telefonas"), after.status_code),
+                         (302, True, 200))
+
+    def test_the_notifications_banner_knows_whether_notifications_reach_the_colleague_anywhere(self):
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        before = client.get("/diena/2026-10-06").get_data(as_text=True)
+        ona = self.garage.colleague_by_email("ona@finbeeverslui.lt")
+        self.garage.add_push_subscription(ona, "https://push.example/1", {"p256dh": "key", "auth": "secret"})
+        after = client.get("/diena/2026-10-06").get_data(as_text=True)
+        profile = client.get("/profilis").get_data(as_text=True)
+        self.assertEqual(('data-reachable="no"' in before, 'data-reachable="yes"' in after,
+                          'id="push-nudge"' in profile), (True, True, False))
 
     def test_a_form_posted_from_another_site_is_refused(self):
         client = self.signed_in("ona@finbeeverslui.lt", name="Ona")

@@ -1,5 +1,19 @@
 {# Pieces shared by several pages. #}
 
+{# One field per Number Plate, so two plates never run together into one. Without JavaScript
+   the single field still takes several, separated by commas. #}
+{% macro plate_fields(plates) %}
+<fieldset class="field plates" data-plates>
+  <legend>Automobilio valstybinis numeris</legend>
+  <div class="plate-list">
+    {% for plate in (plates or ['']) %}
+    <input name="plates" autocapitalize="characters" autocomplete="off" placeholder="ABC 123" value="{{ plate }}" aria-label="Valstybinis numeris">
+    {% endfor %}
+    <button type="button" class="btn btn-quiet" data-add-plate hidden>+ Pridėti dar vieną numerį</button>
+  </div>
+</fieldset>
+{% endmacro %}
+
 {% macro day_picker(days, current, endpoint) %}
 <div class="days" role="tablist">
   {% for option in days %}

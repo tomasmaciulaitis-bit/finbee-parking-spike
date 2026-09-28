@@ -52,8 +52,8 @@ _Avoid_: manager, office manager (job titles, not a role in the app)
 
 **Registration**:
 A finbee employee becoming a Colleague by proving they hold a finbee email address
-(finbeeverslui.lt, finbee.lt or finbee.com) and giving their name and Number Plates. No
-Admin approves it.
+(finbeeverslui.lt, finbee.lt or finbee.com) and giving their name, Phone Number and Number
+Plates. No Admin approves it.
 _LT_: registracija
 _Avoid_: sign-up, account creation, onboarding
 
@@ -68,9 +68,19 @@ _Avoid_: delete, ban, remove
 The registration number of a car a Colleague drives; a Colleague may have several and can
 change them later. The garage entrance has a camera that admits cars by Number Plate, but
 the app has nothing to do with it: in the app a Number Plate only tells people whose car
-is whose. Any Colleague can look up whose car a Number Plate belongs to.
+is whose. Any Colleague can look up whose car a Number Plate belongs to, and sees the
+driver's Phone Number to call them. Each Number Plate is typed in its own field, so two never
+run together into one.
 _LT_: valstybinis numeris
 _Avoid_: licence plate, car registration (collides with Registration), vehicle
+
+**Phone Number**:
+The number a Colleague can be called on, required at Registration and changeable later.
+Whoever looks up one of their Number Plates sees it next to their name, to call them, say,
+to move the car. A Colleague who registered before Phone Numbers existed gives theirs
+before anything else on their next visit.
+_LT_: telefono numeris
+_Avoid_: contact, mobile, phone (alone)
 
 **Visitor**:
 Someone from outside finbee coming to the office by car. Visitors never hold Bookings;

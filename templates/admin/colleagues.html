@@ -14,7 +14,7 @@
             <b>{{ c.name }}</b>
             {% if c.is_admin %}<span class="badge">administratorius</span>{% endif %}
             {% if not c.active %}<span class="badge danger">išjungta</span>{% endif %}
-            <div class="small muted">{{ c.email }}{% if c.plates %} · {{ c.plates | join(', ') }}{% endif %}</div>
+            <div class="small muted">{{ c.email }}{% if c.phone %} · <a class="link" href="tel:{{ c.phone }}">{{ lt.phone(c.phone) }}</a>{% endif %}{% if c.plates %} · {{ c.plates | join(', ') }}{% endif %}</div>
           </div>
         </div>
         {% if c.active %}

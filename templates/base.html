@@ -16,6 +16,29 @@
 </head>
 <body>
 <main>
+  {% if me and not hide_push_nudge %}
+  {# Asks for notifications. app.js shows the part this device can act on: turn them on here,
+     unblock them in the phone's settings, or in an iPhone Safari tab add the app first. It
+     stays hidden where they're on, and on a computer while they reach the Colleague elsewhere. #}
+  <div id="push-nudge" class="card highlight push-nudge" data-reachable="{{ 'yes' if has_push else 'no' }}" hidden>
+    <div class="spread" style="justify-content: flex-start">
+      <span class="push-nudge-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></span>
+      <div data-when="off"><b>Įjunkite pranešimus</b>
+        <div class="small">Pranešime, kai gausite vietą iš eilės, ir vakare priminsime apie rytojaus rezervaciją.</div></div>
+      <div data-when="blocked"><b>Pranešimai užblokuoti</b>
+        <div class="small">Įjunkite juos telefono nustatymuose – tada pranešime, kai gausite vietą iš eilės, ir priminsime apie rezervaciją.</div></div>
+      <div data-when="install"><b>Įjunkite pranešimus</b>
+        <div class="small">iPhone pranešimus gauna tik programėlė, pridėta prie pradžios ekrano.</div></div>
+    </div>
+    <div class="row" data-when="off" style="margin-top: 12px">
+      <button class="btn btn-primary btn-small" data-enable data-key="{{ vapid_public }}">Įjungti pranešimus</button>
+    </div>
+    <div class="row" data-when="install" style="margin-top: 12px">
+      <a class="btn btn-primary btn-small" href="{{ url_for('install_help') }}">Kaip pridėti</a>
+    </div>
+    <p class="small" data-error hidden></p>
+  </div>
+  {% endif %}
   {% if not hide_install_banner %}
   {# Android only: app.js shows it when the page runs in a browser tab, and "Įdiegti" opens the
      browser's own install window where there is one, else the animated guide. #}
