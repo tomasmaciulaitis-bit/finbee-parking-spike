@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parkavimas (prototipas)</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#FDB813">
+<style>
+  body { font: 16px/1.4 -apple-system, system-ui, sans-serif; margin: 0; padding: 16px;
+         padding-top: max(16px, env(safe-area-inset-top)); background: #fff; color: #111; }
+  .banner { background: #FDB813; padding: 8px 12px; border-radius: 8px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  td { border-bottom: 1px solid #eee; padding: 6px 4px; vertical-align: top; overflow-wrap: anywhere; }
+  td:first-child { color: #666; width: 42%; }
+  .ok { color: #0a7d2c; font-weight: 600; }
+  .no { color: #b3261e; font-weight: 600; }
+  section { margin: 18px 0; }
+  h2 { font-size: 17px; margin: 0 0 6px; }
+  input, button { font: inherit; padding: 10px; border-radius: 8px; border: 1px solid #ccc;
+                  width: 100%; box-sizing: border-box; margin: 4px 0; }
+  button { background: #111; color: #fff; border: 0; }
+  button.secondary { background: #eee; color: #111; }
+  pre { background: #f6f6f6; padding: 8px; border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
+  .hint { color: #666; font-size: 14px; margin: 0; }
+  .error { color: #b3261e; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="banner">PROTOTIPAS — bandymas, ne tikra programėlė</div>
+
+<table>
+  <tr><td>Paleista kaip</td><td id="s-mode"></td></tr>
+  <tr><td>Service worker</td><td id="s-sw"></td></tr>
+  <tr><td>Pranešimų leidimas</td><td id="s-perm"></td></tr>
+  <tr><td>Pranešimų prenumerata</td><td id="s-sub"></td></tr>
+  <tr><td>Prisijungta kaip</td><td id="s-email"></td></tr>
+  <tr><td>Sistema</td><td id="s-ua"></td></tr>
+</table>
+<p id="error" class="error"></p>
+
+<section>
+  <h2>1. Įdiekite į pradžios ekraną</h2>
+  <p class="hint">Safari → Bendrinti (kvadratas su rodykle) → „Add to Home Screen“ („Į pradžios ekraną“).
+    Atidarykite iš pradžios ekrano: eilutėje „Paleista kaip“ turi būti „Pradžios ekrano programėlė“.</p>
+</section>
+
+<section>
+  <h2>2. Prisijunkite jau įdiegtoje programėlėje</h2>
+  <input id="email" type="email" placeholder="vardas@finbeeverslui.lt" autocomplete="email">
+  <button id="send-code">Siųsti kodą</button>
+  <input id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="6 skaitmenų kodas">
+  <button id="verify">Prisijungti</button>
+  <button id="sign-out" class="secondary">Atsijungti</button>
+</section>
+
+<section>
+  <h2>3. Pranešimai</h2>
+  <button id="enable-push">Įjungti pranešimus</button>
+  <button id="push-now" class="secondary">Siųsti bandomąjį pranešimą dabar</button>
+  <button id="push-later" class="secondary">Siųsti po 30 s (tada uždarykite programėlę)</button>
+</section>
+
+<section>
+  <h2>4. Uždarykite ir vėl atidarykite</h2>
+  <p class="hint">Perbraukite programėlę aukštyn iš atidarytų programų sąrašo, atidarykite ją iš pradžios
+    ekrano ir patikrinkite „Prisijungta kaip“. Papildomai: prisijunkite Safari skirtuke ir pažiūrėkite, ar
+    įdiegta programėlė tai „mato“.</p>
+</section>
+
+<h2>Įvykiai serveryje</h2>
+<pre id="events">—</pre>
+
+<script>
+const VAPID_PUBLIC = "{{ vapid_public }}";
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const $ = (id) => document.getElementById(id);
+let registration = null;
+
+function flag(el, ok, text) { el.textContent = text; el.className = ok ? 'ok' : 'no'; }
+
+function render(s) {
+  flag($('s-email'), !!s.email, s.email
+    ? `${s.email} (nuo ${s.signed_in_at}; prisijungta ${s.signed_in_in === 'standalone' ? 'programėlėje' : 'naršyklėje'})`
+    : 'neprisijungta');
+  flag($('s-sub'), !!s.subscription, s.subscription ? `serveris ją turi (${s.subscription})` : 'nėra');
+  $('events').textContent = (s.events || []).join('\n') || '—';
+  if (!s.mail_configured) $('error').textContent = 'Serveryje nenustatytas laiškų siuntėjas (set_app_password.py).';
+}
+
+async function api(path, body) {
+  const options = body === undefined ? {} : {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  };
+  const data = await (await fetch(path, options)).json();
+  $('error').textContent = data.error || '';
+  if (!data.error) render(data);
+  return data;
+}
+
+function refreshLocal() {
+  flag($('s-mode'), standalone, standalone ? 'Pradžios ekrano programėlė' : 'Naršyklės skirtukas');
+  const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  flag($('s-perm'), pushSupported && Notification.permission === 'granted',
+    pushSupported ? Notification.permission : 'nepalaikoma (tik pradžios ekrano programėlėje)');
+  const ios = navigator.userAgent.match(/(iPhone OS|CPU OS) [\d_]+/);
+  $('s-ua').textContent = ios ? ios[0].replace(/_/g, '.') : navigator.userAgent.slice(0, 80);
+}
+
+function keyBytes(b64) {
+  const s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - b64.length % 4) % 4));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+}
+
+$('send-code').onclick = () => api('/api/send-code', { email: $('email').value });
+$('verify').onclick = () => api('/api/verify-code', {
+  email: $('email').value, code: $('code').value, display_mode: standalone ? 'standalone' : 'browser',
+});
+$('sign-out').onclick = () => api('/api/sign-out', {});
+$('enable-push').onclick = async () => {
+  try {
+    const permission = await Notification.requestPermission();
+    refreshLocal();
+    if (permission !== 'granted') { $('error').textContent = 'Leidimas nesuteiktas: ' + permission; return; }
+    const sub = await registration.pushManager.subscribe({
+      userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC),
+    });
+    await api('/api/subscribe', sub.toJSON());
+  } catch (e) {
+    $('error').textContent = 'Klaida: ' + e.message;
+  }
+};
+$('push-now').onclick = () => api('/api/test-push', { delay: 0 });
+$('push-later').onclick = () => api('/api/test-push', { delay: 30 });
+
+(async () => {
+  refreshLocal();
+  if ('serviceWorker' in navigator) {
+    try {
+      registration = await navigator.serviceWorker.register('/sw.js');
+      flag($('s-sw'), true, 'užregistruotas');
+    } catch (e) {
+      flag($('s-sw'), false, 'klaida: ' + e.message);
+    }
+  } else {
+    flag($('s-sw'), false, 'nepalaikomas');
+  }
+  const s = await api('/api/state');
+  // The server keeps subscriptions in memory only, so after a restart (Render's free plan sleeps)
+  // hand it the phone's existing subscription again.
+  const existing = registration && registration.pushManager ? await registration.pushManager.getSubscription() : null;
+  if (existing && !s.subscription) await api('/api/subscribe', existing.toJSON());
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { refreshLocal(); api('/api/state'); }
+  });
+})();
+</script>
+</body>
+</html>

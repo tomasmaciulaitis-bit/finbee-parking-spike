@@ -1,0 +1,22 @@
+# PROTOTYPE: Render blueprint for the throwaway iPhone spike, with this folder as the repo root.
+# Free plan is enough for the test. The two mail values are typed into Render's dashboard when
+# the blueprint is applied (sync: false), so the app password never goes into git.
+services:
+  - type: web
+    name: finbee-parking-spike
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PROTOTYPE_HTTPS
+        value: "1"
+      - key: PROTOTYPE_SECRET_KEY
+        generateValue: true
+      - key: PARKING_SENDER_EMAIL
+        sync: false
+      - key: PARKING_SENDER_APP_PASSWORD
+        sync: false

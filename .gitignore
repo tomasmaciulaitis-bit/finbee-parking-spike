@@ -1,0 +1,4 @@
+.venv/
+.env
+PROTOTYPE-wipe-me.json
+__pycache__/
