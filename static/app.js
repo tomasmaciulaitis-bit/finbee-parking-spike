@@ -65,3 +65,50 @@
     }).catch(function (e) { say('Nepavyko įjungti: ' + e.message); });
   });
 })();
+
+// The "add to Home Screen" animation (install page): each step shows a screen, moves the finger to
+// its button and taps it; the matching written step is highlighted as it goes.
+(function () {
+  var demo = document.querySelector('.demo');
+  if (!demo) return;
+  var screen = demo.querySelector('.screen');
+  var finger = demo.querySelector('.finger');
+  var menuFlow = demo.dataset.variant === 'menu';
+  var steps = (menuFlow ? [['start', 'dots', 'dots'], ['menu', 'share', 'share']] : [['start', 'share', 'share']])
+    .concat([['sheet', null, 'add'], ['add', 'add', 'add'], ['dialog', 'confirm', 'confirm'], ['home', 'open', 'open']]);
+  var items = document.querySelectorAll('.steps li[data-step]');
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    demo.dataset.scene = 'dialog';
+    return;
+  }
+  function mark(step) {
+    items.forEach(function (li) { li.classList.toggle('now', li.dataset.step === step); });
+  }
+  function point(target) {
+    var box = screen.getBoundingClientRect(), r = target.getBoundingClientRect();
+    finger.style.left = (r.left - box.left + r.width / 2) + 'px';
+    finger.style.top = (r.top - box.top + r.height / 2) + 'px';
+  }
+  var i = 0;
+  function run() {
+    var scene = steps[i][0], targetName = steps[i][1], step = steps[i][2];
+    demo.dataset.scene = scene;
+    mark(step);
+    demo.querySelectorAll('.hl').forEach(function (el) { el.classList.remove('hl'); });
+    var target = targetName && demo.querySelector('[data-target="' + targetName + '"]');
+    setTimeout(function () {
+      if (target) point(target);
+      setTimeout(function () {
+        if (target) {
+          target.classList.add('hl');
+          finger.classList.remove('tap');
+          void finger.offsetWidth;  // restart the tap animation
+          finger.classList.add('tap');
+        }
+        i = (i + 1) % steps.length;
+        setTimeout(run, i === 0 ? 2200 : target ? 650 : 250);
+      }, target ? 700 : 350);
+    }, 550);
+  }
+  run();
+})();

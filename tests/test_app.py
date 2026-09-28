@@ -12,6 +12,9 @@ from tests.test_garage import Clock  # noqa: E402
 
 IPHONE_SAFARI = ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 "
                  "(KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1")
+# Safari 26 freezes the OS in its user agent at 18_6; only the Version token tells it apart.
+IPHONE_SAFARI_26 = ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 "
+                    "(KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1")
 
 
 class AppTest(unittest.TestCase):
@@ -60,6 +63,12 @@ class AppTest(unittest.TestCase):
         again = client.get("/", headers={"User-Agent": IPHONE_SAFARI}).get_data(as_text=True)
         self.assertEqual(("Pridėkite prie pradžios ekrano" in in_safari, 'name="email"' in in_the_app,
                           'name="email"' in again), (True, True, True))
+
+    def test_the_install_animation_follows_the_iphones_safari(self):
+        def variant(agent):
+            page = self.app.test_client().get("/", headers={"User-Agent": agent}).get_data(as_text=True)
+            return page.split('data-variant="', 1)[1].split('"', 1)[0]
+        self.assertEqual((variant(IPHONE_SAFARI_26), variant(IPHONE_SAFARI)), ("menu", "toolbar"))
 
     def test_a_booking_refused_for_lack_of_space_offers_the_waitlist(self):
         jonas = self.garage.register("jonas@finbeeverslui.lt", "Jonas", [])

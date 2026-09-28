@@ -6,9 +6,12 @@
 <title>{% block title %}Parkavimas{% endblock %} · finbee</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icon-180.png">
-<meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f2f2">
 <meta name="apple-mobile-web-app-title" content="Parkavimas">
+<link rel="icon" href="{{ url_for('static', filename='icon-192.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;700;800&display=swap">
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body>

@@ -8,6 +8,7 @@ the background loop that sends notifications and the evening Reminder lives in t
 """
 import logging
 import os
+import re
 import secrets
 import threading
 from datetime import date, datetime, timedelta
@@ -145,6 +146,18 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         agent = request.headers.get("User-Agent", "")
         return "iPhone" in agent or "iPod" in agent
 
+    def install_page():
+        """The animated "add to Home Screen" steps. Safari 26 hides Share behind "•••"; older
+        Safari has it in the toolbar. Safari 26 freezes the OS version in its user agent, so the
+        Version token is what tells them apart."""
+        agent = request.headers.get("User-Agent", "")
+        forced = request.args.get("safari", "")
+        version = re.search(r"Version/(\d+)", agent)
+        major = int(forced) if forced.isdigit() else int(version.group(1)) if version else 26
+        in_safari = bool(version) and not re.search(r"CriOS|FxiOS|EdgiOS|OPiOS", agent)
+        return render_template("install.html", variant="menu" if major >= 26 else "toolbar",
+                               in_safari=in_safari or bool(forced), host=request.host)
+
     def day_label_short(day):
         today = now().date()
         if day == today:
@@ -208,9 +221,11 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         response = jsonify({
             "name": "finbee parkavimas", "short_name": "Parkavimas", "lang": "lt",
             "start_url": "/?app=1", "scope": "/", "display": "standalone",
-            "background_color": "#f6f6f4", "theme_color": "#FDB813",
+            "background_color": "#f2f2f2", "theme_color": "#f2f2f2",
             "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
-                      {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}]})
+                      {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+                      {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png",
+                       "purpose": "maskable"}]})
         response.mimetype = "application/manifest+json"
         return response
 
@@ -238,7 +253,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         if g.me is not None:
             response = redirect(url_for("today_page"))
         elif is_iphone() and not opened_as_app and request.cookies.get("app") != "1":
-            response = make_response(render_template("install.html"))
+            response = make_response(install_page())
         else:
             response = make_response(render_template("signin.html",
                                                      pending_email=session.get("pending_email")))
@@ -248,6 +263,11 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
             response.set_cookie("app", "1", max_age=10 * 365 * 24 * 3600, samesite="Lax",
                                 secure=cookie_secure, httponly=True)
         return response
+
+    @app.get("/idiegti")
+    def install_help():
+        """The same steps on demand, e.g. to re-add the app after its icon changes."""
+        return install_page()
 
     @app.post("/kodas")
     def request_code():
