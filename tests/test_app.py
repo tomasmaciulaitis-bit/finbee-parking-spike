@@ -12,6 +12,8 @@ from tests.test_garage import Clock  # noqa: E402
 
 IPHONE_SAFARI = ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 "
                  "(KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1")
+ANDROID_CHROME = ("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/130.0.0.0 Mobile Safari/537.36")
 # Safari 26 freezes the OS in its user agent at 18_6; only the Version token tells it apart.
 IPHONE_SAFARI_26 = ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 "
                     "(KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1")
@@ -69,6 +71,14 @@ class AppTest(unittest.TestCase):
             page = self.app.test_client().get("/", headers={"User-Agent": agent}).get_data(as_text=True)
             return page.split('data-variant="', 1)[1].split('"', 1)[0]
         self.assertEqual((variant(IPHONE_SAFARI_26), variant(IPHONE_SAFARI)), ("menu", "toolbar"))
+
+    def test_an_android_visitors_install_guide_follows_chromes_menu(self):
+        page = self.app.test_client().get("/idiegti", headers={"User-Agent": ANDROID_CHROME}).get_data(as_text=True)
+        self.assertEqual(page.split('data-variant="', 1)[1].split('"', 1)[0], "android")
+
+    def test_android_is_not_made_to_install_first(self):
+        page = self.app.test_client().get("/", headers={"User-Agent": ANDROID_CHROME}).get_data(as_text=True)
+        self.assertEqual(('name="email"' in page, 'id="install-banner"' in page), (True, True))
 
     def test_a_booking_refused_for_lack_of_space_offers_the_waitlist(self):
         jonas = self.garage.register("jonas@finbeeverslui.lt", "Jonas", [])

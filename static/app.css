@@ -286,3 +286,37 @@ nav.tabs a.active svg { stroke-width: 2.2; }
 @media (prefers-reduced-motion: reduce) {
   .phone *, .phone .finger.tap { transition: none !important; animation: none !important; }
 }
+
+/* the Android version: Chrome's top bar and ⋮ menu, its install dialog, round launcher icons */
+.demo[data-variant="android"] .page { padding-top: 66px; }
+.phone .chrome-top {
+  position: absolute; top: 24px; left: 8px; right: 8px; height: 32px; border-radius: 999px; background: #f1f3f4;
+  display: flex; align-items: center; gap: 6px; padding: 0 6px 0 14px; transition: opacity .3s;
+}
+.phone .chrome-top .url { flex: 1; font-size: 10px; color: #5f6368; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phone .chrome-top .kebab { font-size: 18px; font-weight: 700; line-height: 1; padding: 4px 8px; border-radius: 999px; }
+.phone .amenu {
+  position: absolute; top: 60px; right: 8px; width: 150px; border-radius: 10px; background: #fff; padding: 4px 0;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .2); opacity: 0; transform: scale(.9); transform-origin: top right;
+  transition: opacity .25s, transform .25s;
+}
+.phone .amenu div { padding: 9px 14px; }
+.phone .ascrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .32); opacity: 0; transition: opacity .3s; pointer-events: none; }
+.phone .adialog {
+  position: absolute; left: 12px; right: 12px; top: 32%; border-radius: 22px; background: #fff; padding: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .25); opacity: 0; transform: translateY(16px); transition: opacity .3s, transform .3s;
+}
+.phone .adialog-app { display: flex; gap: 10px; align-items: center; margin: 12px 0 16px; }
+.phone .adialog-app img { width: 40px; height: 40px; border-radius: 50%; }
+.phone .adialog-actions { display: flex; justify-content: flex-end; gap: 18px; font-weight: 700; color: #1a73e8; }
+.phone .adialog-actions span { padding: 4px 6px; border-radius: 999px; }
+.phone .home.round i, .phone .home.round .app img { border-radius: 50%; }
+.demo[data-scene="amenu"] .amenu { opacity: 1; transform: none; }
+.demo[data-scene="adialog"] .ascrim { opacity: 1; }
+.demo[data-scene="adialog"] .adialog { opacity: 1; transform: none; }
+.demo[data-scene="home"] .chrome-top { opacity: 0; }
+
+/* the Android install banner */
+.install-banner img { border-radius: 12px; flex: 0 0 auto; }
+.install-banner .row { justify-content: flex-start; }
+.install-banner .row > * { flex: 0 0 auto; }

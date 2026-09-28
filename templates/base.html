@@ -16,6 +16,21 @@
 </head>
 <body>
 <main>
+  {% if not hide_install_banner %}
+  {# Android only: app.js shows it when the page runs in a browser tab, and "Įdiegti" opens the
+     browser's own install window where there is one, else the animated guide. #}
+  <div id="install-banner" class="card install-banner" hidden>
+    <div class="spread" style="justify-content: flex-start">
+      <img src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="44" height="44">
+      <div><b>Įdiekite programėlę</b>
+        <div class="caption">Parkavimas atsidarys iš pradžios ekrano kaip įprasta programėlė.</div></div>
+    </div>
+    <div class="row" style="margin-top: 12px">
+      <button class="btn btn-primary btn-small" data-install>Įdiegti</button>
+      <button class="btn btn-quiet" data-dismiss>Ne dabar</button>
+    </div>
+  </div>
+  {% endif %}
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
       <div class="flash {{ 'error' if category == 'error' }}" role="status">{{ message }}</div>

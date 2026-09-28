@@ -73,12 +73,17 @@
   if (!demo) return;
   var screen = demo.querySelector('.screen');
   var finger = demo.querySelector('.finger');
-  var menuFlow = demo.dataset.variant === 'menu';
-  var steps = (menuFlow ? [['start', 'dots', 'dots'], ['menu', 'share', 'share']] : [['start', 'share', 'share']])
-    .concat([['sheet', null, 'add'], ['add', 'add', 'add'], ['dialog', 'confirm', 'confirm'], ['home', 'open', 'open']]);
+  // [screen to show, button the finger taps, written step to highlight]
+  var ios = [['sheet', null, 'add'], ['add', 'add', 'add'], ['dialog', 'confirm', 'confirm'], ['home', 'open', 'open']];
+  var steps = {
+    menu: [['start', 'dots', 'dots'], ['menu', 'share', 'share']].concat(ios),
+    toolbar: [['start', 'share', 'share']].concat(ios),
+    android: [['start', 'kebab', 'kebab'], ['amenu', 'aadd', 'aadd'], ['adialog', 'ainstall', 'ainstall'],
+              ['home', 'open', 'open']]
+  }[demo.dataset.variant];
   var items = document.querySelectorAll('.steps li[data-step]');
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    demo.dataset.scene = 'dialog';
+    demo.dataset.scene = demo.dataset.variant === 'android' ? 'adialog' : 'dialog';
     return;
   }
   function mark(step) {
@@ -111,4 +116,29 @@
     }, 550);
   }
   run();
+})();
+
+// The Android install banner: only in an Android browser tab, never inside the installed app.
+// "Įdiegti" opens the browser's own install window when it offers one, else the animated guide.
+(function () {
+  var banner = document.getElementById('install-banner');
+  if (!banner) return;
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  var hiddenUntil = 0;
+  try { hiddenUntil = Number(localStorage.getItem('installBannerHiddenUntil')) || 0; } catch (e) {}
+  if (!/Android/i.test(navigator.userAgent) || standalone || Date.now() < hiddenUntil) return;
+  var offer = null;
+  window.addEventListener('beforeinstallprompt', function (event) { event.preventDefault(); offer = event; });
+  window.addEventListener('appinstalled', function () { banner.hidden = true; });
+  banner.hidden = false;
+  banner.querySelector('[data-install]').addEventListener('click', function () {
+    if (!offer) { window.location.href = '/idiegti'; return; }
+    offer.prompt();
+    offer.userChoice.then(function (choice) { if (choice.outcome === 'accepted') banner.hidden = true; });
+    offer = null;
+  });
+  banner.querySelector('[data-dismiss]').addEventListener('click', function () {
+    banner.hidden = true;
+    try { localStorage.setItem('installBannerHiddenUntil', String(Date.now() + 30 * 24 * 3600 * 1000)); } catch (e) {}
+  });
 })();

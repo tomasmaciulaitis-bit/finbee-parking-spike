@@ -147,11 +147,13 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         return "iPhone" in agent or "iPod" in agent
 
     def install_page():
-        """The animated "add to Home Screen" steps. Safari 26 hides Share behind "•••"; older
-        Safari has it in the toolbar. Safari 26 freezes the OS version in its user agent, so the
-        Version token is what tells them apart."""
+        """The animated "add to Home Screen" steps. Android follows Chrome's ⋮ menu. On iPhone,
+        Safari 26 hides Share behind "•••" while older Safari has it in the toolbar; Safari 26
+        freezes the OS version in its user agent, so its Version token is what tells them apart."""
         agent = request.headers.get("User-Agent", "")
         forced = request.args.get("safari", "")
+        if "Android" in agent and not forced:
+            return render_template("install.html", variant="android", in_safari=True, host=request.host)
         version = re.search(r"Version/(\d+)", agent)
         major = int(forced) if forced.isdigit() else int(version.group(1)) if version else 26
         in_safari = bool(version) and not re.search(r"CriOS|FxiOS|EdgiOS|OPiOS", agent)
@@ -219,7 +221,8 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
     @app.get("/manifest.webmanifest")
     def manifest():
         response = jsonify({
-            "name": "finbee parkavimas", "short_name": "Parkavimas", "lang": "lt",
+            "id": "/", "name": "finbee parkavimas", "short_name": "Parkavimas", "lang": "lt",
+            "description": "Rezervuokite vietą finbee biuro požeminiame garaže.",
             "start_url": "/?app=1", "scope": "/", "display": "standalone",
             "background_color": "#f2f2f2", "theme_color": "#f2f2f2",
             "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},

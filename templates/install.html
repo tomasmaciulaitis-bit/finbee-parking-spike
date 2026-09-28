@@ -1,11 +1,17 @@
 {% extends "base.html" %}
+{% set hide_install_banner = True %}
 {% block title %}Įdiekite programėlę{% endblock %}
 {% set share_icon %}<svg class="ico" viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5M8 11H6.5A1.5 1.5 0 0 0 5 12.5v7A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5H16"/></svg>{% endset %}
 {% set add_icon %}<svg class="ico" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M12 8.5v7M8.5 12h7"/></svg>{% endset %}
+{% set android = variant == 'android' %}
 {% block content %}
 <img class="brand" src="{{ url_for('static', filename='finbee-logo.svg') }}" alt="finbee">
 <h1>Pridėkite prie pradžios ekrano</h1>
+{% if android %}
+<p class="muted">Įdiekite Parkavimą – jis atsidarys iš pradžios ekrano kaip įprasta programėlė.</p>
+{% else %}
 <p class="muted">Parkavimą naudokite kaip programėlę iš pradžios ekrano – tik taip veiks pranešimai. Prisijunkite jau joje: prisijungimas Safari lange į programėlę neperkeliamas.</p>
+{% endif %}
 
 <div class="demo" data-variant="{{ variant }}" aria-hidden="true">
   <div class="phone"><div class="screen">
@@ -13,7 +19,27 @@
       <div class="ph-title"></div><div class="ph-line"></div><div class="ph-line" style="width: 72%"></div>
       <div class="ph-card"></div><div class="ph-btn"></div><div class="ph-card"></div>
     </div>
-    {% if variant == 'menu' %}
+    {% if android %}
+      <div class="chrome-top">
+        <span class="url">{{ host }}</span><span class="kebab" data-target="kebab">⋮</span>
+      </div>
+      <div class="amenu">
+        <div>New tab</div>
+        <div>Bookmarks</div>
+        <div>History</div>
+        <div data-target="aadd">Add to Home screen</div>
+        <div>Settings</div>
+      </div>
+      <div class="ascrim"></div>
+      <div class="adialog">
+        <b>Install app</b>
+        <div class="adialog-app">
+          <img src="{{ url_for('static', filename='icon-192.png') }}" alt="">
+          <div><b>Parkavimas</b><div class="caption">{{ host }}</div></div>
+        </div>
+        <div class="adialog-actions"><span>Cancel</span><span class="ainstall" data-target="ainstall">Install</span></div>
+      </div>
+    {% elif variant == 'menu' %}
       <div class="bar-bottom">
         <span class="url">{{ host }}</span><span class="dots" data-target="dots">•••</span>
       </div>
@@ -32,6 +58,7 @@
         <svg class="ico" viewBox="0 0 24 24"><rect x="4" y="7" width="12" height="12" rx="2"/><path d="M8 4h10a2 2 0 0 1 2 2v10"/></svg>
       </div>
     {% endif %}
+    {% if not android %}
     <div class="sheet">
       <div class="grip"></div>
       <div class="rows">
@@ -51,7 +78,8 @@
       </div>
       {% if variant == 'menu' %}<div class="dlg-toggle">Open as Web App <i class="switch"></i></div>{% endif %}
     </div>
-    <div class="home">
+    {% endif %}
+    <div class="home {{ 'round' if android }}">
       {% for _ in range(9) %}<i></i>{% endfor %}
       <div class="app" data-target="open"><img src="{{ url_for('static', filename='icon-180.png') }}" alt=""><span>Parkavimas</span></div>
       {% for _ in range(6) %}<i></i>{% endfor %}
@@ -62,18 +90,24 @@
 
 <div class="card">
   <ol class="steps">
-    {% if variant == 'menu' %}
-      <li data-step="dots">Apačioje, šalia adreso, paspauskite <b>•••</b>.</li>
-      <li data-step="share">Pasirinkite <b>„Share“</b> – kvadratėlis su rodykle aukštyn.</li>
+    {% if android %}
+      <li data-step="kebab">Viršuje dešinėje paspauskite <b>⋮</b> (trys taškai).</li>
+      <li data-step="aadd">Pasirinkite <b>„Add to Home screen“</b> (kai kur – <b>„Install app“</b>).</li>
+      <li data-step="ainstall">Paspauskite <b>„Install“</b>.</li>
     {% else %}
-      <li data-step="share">Apačioje paspauskite <b>„Share“</b> – kvadratėlis su rodykle aukštyn.</li>
+      {% if variant == 'menu' %}
+        <li data-step="dots">Apačioje, šalia adreso, paspauskite <b>•••</b>.</li>
+        <li data-step="share">Pasirinkite <b>„Share“</b> – kvadratėlis su rodykle aukštyn.</li>
+      {% else %}
+        <li data-step="share">Apačioje paspauskite <b>„Share“</b> – kvadratėlis su rodykle aukštyn.</li>
+      {% endif %}
+      <li data-step="add">Slinkite žemyn ir pasirinkite <b>„Add to Home Screen“</b> – kvadratėlis su pliusu.</li>
+      <li data-step="confirm">{% if variant == 'menu' %}Palikite įjungtą <b>„Open as Web App“</b> ir paspauskite{% else %}Paspauskite{% endif %} <b>„Add“</b>.</li>
     {% endif %}
-    <li data-step="add">Slinkite žemyn ir pasirinkite <b>„Add to Home Screen“</b> – kvadratėlis su pliusu.</li>
-    <li data-step="confirm">{% if variant == 'menu' %}Palikite įjungtą <b>„Open as Web App“</b> ir paspauskite{% else %}Paspauskite{% endif %} <b>„Add“</b>.</li>
-    <li data-step="open">Atidarykite <b>Parkavimas</b> iš pradžios ekrano ir prisijunkite.</li>
+    <li data-step="open">Atidarykite <b>Parkavimas</b> iš pradžios ekrano{% if not android %} ir prisijunkite{% endif %}.</li>
   </ol>
   <p class="caption">Jei telefono kalba lietuvių, meniu pavadinimai bus lietuviški – ieškokite tų pačių ženkliukų.</p>
 </div>
 {% if not in_safari %}<p class="small">Naudojate kitą naršyklę? Atidarykite šį adresą <b>Safari</b>.</p>{% endif %}
-<p class="small"><a href="/?app=1" class="muted">Vis tiek naudoti naršyklėje</a></p>
+<p class="small"><a href="/?app=1" class="muted">{{ 'Grįžti' if android else 'Vis tiek naudoti naršyklėje' }}</a></p>
 {% endblock %}
