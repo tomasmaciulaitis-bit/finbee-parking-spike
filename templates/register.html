@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Registracija{% endblock %}
+{% block content %}
+<p class="eyebrow">Registracija</p>
+<h1>Sveiki!</h1>
+<p class="muted">{{ email }} – dar du dalykai ir galėsite rezervuoti.</p>
+<form class="card" method="post" action="{{ url_for('register') }}">
+  <label class="field"><span>Vardas ir pavardė</span>
+    <input name="name" autocomplete="name" value="{{ form.get('name', '') }}" required autofocus>
+  </label>
+  <label class="field"><span>Automobilio valstybinis numeris (keli – per kablelį)</span>
+    <input name="plates" autocapitalize="characters" placeholder="ABC 123" value="{{ form.get('plates', '') }}">
+  </label>
+  <p class="small muted">Numeris padeda kolegoms išsiaiškinti, kieno automobilis stovi vietoje.</p>
+  <button class="btn btn-primary btn-block">Pradėti</button>
+</form>
+{% endblock %}

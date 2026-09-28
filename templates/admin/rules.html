@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% set tab = 'admin' %}
+{% set section = 'rules' %}
+{% block title %}Rezervavimo taisyklės{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h1>Rezervavimo taisyklės</h1>
+<p class="muted">Pakeitimai galioja tik naujoms rezervacijoms – esamos lieka.</p>
+<form class="card" method="post" action="{{ url_for('admin_rules') }}">
+  <label class="field"><span>Išankstinio rezervavimo laikotarpis (dienomis į priekį)</span>
+    <input type="number" name="window_days" min="1" max="60" value="{{ rules.window_days }}" required>
+  </label>
+  <label class="field"><span>Rezervacijų atidarymo laikas (kada atsiveria nauja diena)</span>
+    <select name="opening_time">{% for t in times %}<option {{ 'selected' if t == rules.opening_time }}>{{ t }}</option>{% endfor %}</select>
+  </label>
+  <div class="row">
+    <label class="field"><span>Rezervavimo valandos nuo</span>
+      <select name="hours_start">{% for t in times %}<option {{ 'selected' if t == rules.hours_start }}>{{ t }}</option>{% endfor %}</select>
+    </label>
+    <label class="field"><span>iki</span>
+      <select name="hours_end">{% for t in times %}<option {{ 'selected' if t == rules.hours_end }}>{{ t }}</option>{% endfor %}</select>
+    </label>
+  </div>
+  <label class="field"><span>Rezervacijų limitas (būsimų rezervacijų ir užsirašymų į eilę vienu metu)</span>
+    <input type="number" name="booking_limit" min="1" max="20" value="{{ rules.booking_limit }}" required>
+  </label>
+  <button class="btn btn-primary btn-block">Išsaugoti</button>
+</form>
+{% endblock %}

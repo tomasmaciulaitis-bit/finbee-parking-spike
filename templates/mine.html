@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "_macros.html" import period_fields with context %}
+{% set tab = 'mine' %}
+{% block title %}Mano rezervacijos{% endblock %}
+{% block content %}
+<p class="eyebrow">Mano rezervacijos</p>
+<h1>Būsimos</h1>
+<div class="card">
+  {% if mine.upcoming %}
+    <ul class="list">
+      {% for booking in mine.upcoming %}
+        {% set started = booking.day == today and booking.start <= now_hhmm %}
+        <li class="spread">
+          <div>
+            <b>Vieta Nr. {{ booking.space }}</b>
+            <div class="small">{{ lt.sentence(lt.day_label(booking.day)) }}, {{ booking.start }}–{{ booking.end }}</div>
+          </div>
+          <form method="post" action="{{ url_for('cancel', booking_id=booking.id) }}"
+                onsubmit="return confirm('{{ 'Išvažiuojate? Likęs laikas atiteks kitiems.' if started else 'Atšaukti rezervaciją?' }}')">
+            <button class="btn btn-danger btn-small">{{ 'Išvažiuoju' if started else 'Atšaukti' }}</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">Rezervacijų nėra. <a href="{{ url_for('today_page') }}">Rezervuoti</a></p>
+  {% endif %}
+</div>
+
+{% if mine.waiting %}
+<h2>Laukiate eilėje</h2>
+<div class="card">
+  <ul class="list">
+    {% for entry in mine.waiting %}
+      <li class="spread">
+        <div>
+          <b>{{ lt.sentence(lt.day_label(entry.day)) }}</b>
+          <div class="small">{{ entry.start }}–{{ entry.end }} · gausite automatiškai, kai atsiras vieta</div>
+        </div>
+        <form method="post" action="{{ url_for('leave_waitlist', entry_id=entry.id) }}">
+          <button class="btn btn-quiet">Palikti</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if my_space %}
+<h2>Mano nuolatinė vieta Nr. {{ my_space.number }}</h2>
+<form class="card" method="post" action="{{ url_for('release') }}" data-period>
+  <p class="small muted">Nevažiuosite? Atlaisvinkite vietą – ją gaus laukiantys kolegos. Kol niekas nerezervavo, galite ją susigrąžinti.</p>
+  <label class="field"><span>Diena</span>
+    <input type="date" name="day" min="{{ today.isoformat() }}" value="{{ today.isoformat() }}" required>
+  </label>
+  {{ period_fields(starts, ends) }}
+  <button class="btn btn-primary btn-block">Atlaisvinti</button>
+</form>
+{% if my_space.releases %}
+<div class="card">
+  <ul class="list">
+    {% for release in my_space.releases %}
+      <li class="spread">
+        <div>
+          <b>{{ lt.sentence(lt.day_label(release.day)) }}</b>
+          <div class="small">{{ release.start }}–{{ release.end }}
+            {% if release.booked %}<span class="badge">rezervuota</span>{% endif %}</div>
+        </div>
+        <form method="post" action="{{ url_for('reclaim', release_id=release.id) }}">
+          <button class="btn btn-small" {{ 'disabled' if release.booked }}>Susigrąžinti</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endif %}
+
+{% if mine.past %}
+<h2>Praėjusios</h2>
+<div class="card">
+  <ul class="list">
+    {% for booking in mine.past[:20] %}
+      <li class="spread small">
+        <span>{{ lt.sentence(lt.day_label(booking.day)) }}, {{ booking.start }}–{{ booking.end }}</span>
+        <span class="muted">Nr. {{ booking.space }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

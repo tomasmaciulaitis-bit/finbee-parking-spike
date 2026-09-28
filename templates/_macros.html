@@ -1,0 +1,69 @@
+{# Pieces shared by several pages. #}
+
+{% macro day_picker(days, current, endpoint) %}
+<div class="days" role="tablist">
+  {% for option in days %}
+    {% set top, bottom = day_label_short(option.day) %}
+    <a class="day-chip {{ 'active' if option.day == current }} {{ 'closed' if option.closed }}"
+       href="{{ url_for(endpoint, iso=option.day.isoformat()) }}">
+      {{ top }}<b>{{ bottom or option.day.day }}</b>
+    </a>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro period_fields(starts, ends, kind='whole', start='', end='') %}
+<div class="segmented">
+  <label><input type="radio" name="kind" value="whole" {{ 'checked' if kind != 'part' }}><span>Visa diena</span></label>
+  <label><input type="radio" name="kind" value="part" {{ 'checked' if kind == 'part' }}><span>Pasirinkti laiką</span></label>
+</div>
+<div class="row" data-part>
+  <label class="field"><span>Nuo</span>
+    <select name="start">{% for t in starts %}<option {{ 'selected' if t == start }}>{{ t }}</option>{% endfor %}</select>
+  </label>
+  <label class="field"><span>Iki</span>
+    <select name="end">{% for t in ends %}<option {{ 'selected' if t == (end or '17:00') }}>{{ t }}</option>{% endfor %}</select>
+  </label>
+</div>
+{% endmacro %}
+
+{% macro space_row(space, admin=False, next_url='') %}
+<div class="space {{ 'blocked' if space.blocked }}">
+  <div class="space-number">{{ space.number }}</div>
+  <div class="space-body">
+    <div class="spread">
+      <span class="small muted">
+        {% if space.blocked %}Užblokuota{% elif space.owner %}Nuolatinė · {{ space.owner }}{% else %}Bendra{% endif %}
+      </span>
+      {% if not space.blocked and not space.bookings and (not space.owner or space.released) %}
+        <span class="badge ok">Laisva</span>
+      {% endif %}
+    </div>
+    <div class="bar">
+      {% for start, end in space.released %}
+        <i class="released" style="left: {{ position(start) }}%; width: {{ position(end) - position(start) }}%"></i>
+      {% endfor %}
+      {% for held in space.bookings %}
+        <i style="left: {{ position(held.start) }}%; width: {{ position(held.end) - position(held.start) }}%"></i>
+      {% endfor %}
+    </div>
+    {% for held in space.bookings %}
+      <div class="slot {{ 'mine' if held.mine }}">
+        <span>{{ 'Jūs' if held.mine else held.name }}</span>
+        <span class="muted">{{ held.start }}–{{ held.end }}
+          {% if admin %}
+            <form class="inline" method="post" action="{{ url_for('admin_cancel', booking_id=held.id) }}"
+                  onsubmit="return confirm('Atšaukti šią rezervaciją? Kolegai bus pranešta.')">
+              <input type="hidden" name="next" value="{{ next_url }}">
+              <button class="btn btn-quiet small">Atšaukti</button>
+            </form>
+          {% endif %}
+        </span>
+      </div>
+    {% endfor %}
+    {% if space.owner and space.released %}
+      <div class="small muted">Atlaisvinta: {% for start, end in space.released %}{{ start }}–{{ end }}{{ ', ' if not loop.last }}{% endfor %}</div>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}

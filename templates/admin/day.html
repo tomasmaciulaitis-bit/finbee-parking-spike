@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_macros.html" import day_picker, space_row with context %}
+{% set tab = 'admin' %}
+{% set section = 'day' %}
+{% block title %}Administravimas{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h1>{{ lt.sentence(lt.day_label(day)) }}</h1>
+{{ day_picker(days, day, 'admin_day') }}
+
+<div class="card">
+  <h2>Vietos</h2>
+  {% for space in view.spaces %}{{ space_row(space, admin=True, next_url=request.path) }}{% endfor %}
+</div>
+
+<div class="card">
+  <h2>Laukiančiųjų sąrašas</h2>
+  {% if waiting %}
+    <ol class="list">
+      {% for entry in waiting %}
+        <li class="spread"><span>{{ loop.index }}. {{ entry.name }}</span><span class="muted">{{ entry.start }}–{{ entry.end }}</span></li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p class="muted">Niekas nelaukia.</p>
+  {% endif %}
+</div>
+
+{% set owned = view.spaces | selectattr('owner') | list %}
+{% if owned %}
+<form class="card" method="post" action="{{ url_for('release') }}">
+  <h2>Atlaisvinti turėtojo vardu</h2>
+  <input type="hidden" name="day" value="{{ day.isoformat() }}">
+  <input type="hidden" name="kind" value="whole">
+  <input type="hidden" name="next" value="{{ request.path }}">
+  <label class="field"><span>Nuolatinė vieta</span>
+    <select name="space">{% for space in owned %}<option value="{{ space.number }}">Nr. {{ space.number }} · {{ space.owner }}</option>{% endfor %}</select>
+  </label>
+  <button class="btn btn-block">Atlaisvinti visą dieną</button>
+</form>
+{% endif %}
+{% endblock %}

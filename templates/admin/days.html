@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% set tab = 'admin' %}
+{% set section = 'days' %}
+{% block title %}Uždarytos dienos{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h1>Uždarytos dienos</h1>
+<p class="muted">Savaitgaliai uždaryti visada. Uždarius dieną, jos rezervacijos ir eilė atšaukiamos, kolegoms pranešama.</p>
+<form class="card" method="post" action="{{ url_for('admin_days') }}"
+      onsubmit="return confirm('Visos tos dienos rezervacijos bus atšauktos. Tęsti?')">
+  <div class="row">
+    <input type="date" name="day" min="{{ today.isoformat() }}" required>
+    <button class="btn btn-danger" style="flex: 0 0 auto">Uždaryti</button>
+  </div>
+</form>
+<div class="card">
+  {% if closed %}
+    <ul class="list">
+      {% for day in closed %}
+        <li class="spread">
+          <span>{{ lt.sentence(lt.day_label(day)) }}</span>
+          <form method="post" action="{{ url_for('admin_reopen', iso=day.isoformat()) }}">
+            <button class="btn btn-quiet">Atidaryti</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">Uždarytų dienų nėra.</p>
+  {% endif %}
+</div>
+{% endblock %}

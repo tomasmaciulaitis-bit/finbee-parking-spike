@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% set tab = 'profile' %}
+{% block title %}Profilis{% endblock %}
+{% block content %}
+<p class="eyebrow">Profilis</p>
+<h1>{{ me.name }}</h1>
+<p class="muted">{{ me.email }}{% if me.is_admin %} · administratorius{% endif %}</p>
+
+<div class="card">
+  <h2>Pranešimai</h2>
+  <p id="push-status" class="small muted">Tikrinama…</p>
+  <button id="enable-push" class="btn btn-primary btn-block" data-key="{{ vapid_public }}">Įjungti pranešimus</button>
+  <p class="small muted">Pranešime, kai gausite vietą iš eilės, ir priminsime vakarą prieš rezervaciją. Svarbiausi pranešimai ateina ir el. paštu.</p>
+</div>
+
+<form class="card" method="post" action="{{ url_for('profile') }}">
+  <h2>Valstybiniai numeriai</h2>
+  <label class="field"><span>Keli – per kablelį</span>
+    <input name="plates" autocapitalize="characters" value="{{ plates }}" placeholder="ABC 123">
+  </label>
+  <button class="btn btn-block">Išsaugoti</button>
+</form>
+
+<form method="post" action="{{ url_for('sign_out') }}">
+  <button class="btn btn-quiet">Atsijungti</button>
+</form>
+{% endblock %}

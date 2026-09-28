@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% set tab = 'admin' %}
+{% set section = 'colleagues' %}
+{% block title %}Kolegos{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h1>Kolegos</h1>
+<div class="card">
+  <ul class="list">
+    {% for c in colleagues %}
+      <li>
+        <div class="spread">
+          <div>
+            <b>{{ c.name }}</b>
+            {% if c.is_admin %}<span class="badge">administratorius</span>{% endif %}
+            {% if not c.active %}<span class="badge danger">išjungta</span>{% endif %}
+            <div class="small muted">{{ c.email }}{% if c.plates %} · {{ c.plates | join(', ') }}{% endif %}</div>
+          </div>
+        </div>
+        {% if c.active %}
+        <div class="row" style="margin-top: 6px">
+          <form method="post" action="{{ url_for('admin_toggle_admin', colleague_id=c.id) }}">
+            <button class="btn btn-small btn-block">{{ 'Atimti administratoriaus teises' if c.is_admin else 'Padaryti administratoriumi' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('admin_deactivate', colleague_id=c.id) }}"
+                onsubmit="return confirm('Išjungti {{ c.name }} paskyrą? Būsimos rezervacijos bus atšauktos.')">
+            <button class="btn btn-danger btn-small btn-block">Išjungti paskyrą</button>
+          </form>
+        </div>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

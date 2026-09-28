@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "_macros.html" import day_picker, period_fields, space_row with context %}
+{% set tab = 'day' %}
+{% block title %}{{ lt.sentence(lt.day_label(day)) }}{% endblock %}
+{% block content %}
+<p class="eyebrow">Dienos užimtumas</p>
+<h1>{{ lt.sentence(lt.day_label(day)) }}</h1>
+{{ day_picker(days, day, 'day_page') }}
+
+{% if my_booking %}
+  <div class="card highlight">
+    <div class="spread">
+      <div>
+        <div class="small muted">Jūsų rezervacija</div>
+        <h2 style="margin: 2px 0">Vieta Nr. {{ my_booking.space }}</h2>
+        <div>{{ my_booking.start }}–{{ my_booking.end }}</div>
+      </div>
+      <form method="post" action="{{ url_for('cancel', booking_id=my_booking.id) }}"
+            onsubmit="return confirm('Atšaukti rezervaciją?')">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <button class="btn btn-danger btn-small">{{ 'Išvažiuoju' if my_booking.day == today and my_booking.start <= now_hhmm else 'Atšaukti' }}</button>
+      </form>
+    </div>
+  </div>
+{% elif my_entry %}
+  <div class="card highlight">
+    <div class="small muted">Laukiate</div>
+    <h2 style="margin: 2px 0">Eilėje: {{ view.my_place }} iš {{ view.waiting }}</h2>
+    <p class="small">{{ my_entry.start }}–{{ my_entry.end }}. Kai vieta atsiras, ją gausite automatiškai.</p>
+    <form method="post" action="{{ url_for('leave_waitlist', entry_id=my_entry.id) }}">
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <button class="btn btn-quiet">Palikti eilę</button>
+    </form>
+  </div>
+{% elif option is none %}
+  <div class="card"><p class="muted">Ši diena už rezervavimo laikotarpio ribų.</p></div>
+{% elif option.closed %}
+  <div class="card"><p class="muted">Tą dieną garažas uždarytas.</p></div>
+{% elif offer %}
+  <div class="card highlight">
+    <h2>Laisvų vietų nėra</h2>
+    <p>Užsirašykite į laukiančiųjų sąrašą – kai vieta atsiras, ją gausite automatiškai ir jums pranešime.</p>
+    <form method="post" action="{{ url_for('join_waitlist') }}">
+      <input type="hidden" name="day" value="{{ day.isoformat() }}">
+      <input type="hidden" name="kind" value="{{ offer_kind }}">
+      <input type="hidden" name="start" value="{{ offer_start }}">
+      <input type="hidden" name="end" value="{{ offer_end }}">
+      <button class="btn btn-primary btn-block">Užsirašyti į eilę{% if offer_kind == 'part' %} ({{ offer_start }}–{{ offer_end }}){% endif %}</button>
+    </form>
+    {% if view.waiting %}<p class="small muted">Jau laukia: {{ view.waiting }}.</p>{% endif %}
+  </div>
+{% else %}
+  <form class="card" method="post" action="{{ url_for('book') }}" data-period>
+    <h2>Rezervuoti vietą</h2>
+    <input type="hidden" name="day" value="{{ day.isoformat() }}">
+    {{ period_fields(starts, ends) }}
+    <button class="btn btn-primary btn-block">Rezervuoti</button>
+    <p class="small muted">Vietą parinksime automatiškai. Galite turėti iki {{ rules.booking_limit }} būsimų rezervacijų.</p>
+  </form>
+{% endif %}
+
+<div class="card">
+  <h2>Laisva</h2>
+  {% if view.availability %}
+    <ul class="free-list">
+      {% for free in view.availability %}
+        <li><span>{{ free.start }}–{{ free.end }}</span>
+            <span class="muted">{{ free.spaces }} {{ 'vieta' if free.spaces == 1 else 'vietos' }}</span></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">Laisvų vietų nėra{% if view.waiting %} · laukia {{ view.waiting }}{% endif %}.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Vietos</h2>
+  {% for space in view.spaces %}{{ space_row(space) }}{% endfor %}
+</div>
+
+<form class="card" method="get" action="{{ request.path }}">
+  <h2>Kieno automobilis?</h2>
+  <div class="row">
+    <input name="numeris" autocapitalize="characters" placeholder="ABC 123" value="{{ plate }}">
+    <button class="btn" style="flex: 0 0 auto">Ieškoti</button>
+  </div>
+  {% if plate %}
+    <p>{% if plate_owner %}<b>{{ plate_owner }}</b>{% else %}<span class="muted">Tokio numerio nėra.</span>{% endif %}</p>
+  {% endif %}
+</form>
+{% endblock %}

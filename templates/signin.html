@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Prisijungimas{% endblock %}
+{% block content %}
+<p class="eyebrow">finbee parkavimas</p>
+<h1>Prisijunkite</h1>
+{% if not pending_email %}
+<p class="muted">Įveskite darbo el. paštą – atsiųsime 6 skaitmenų kodą.</p>
+<form class="card" method="post" action="{{ url_for('request_code') }}">
+  <label class="field"><span>El. paštas</span>
+    <input type="email" name="email" autocomplete="email" inputmode="email" placeholder="vardas@finbeeverslui.lt" required autofocus>
+  </label>
+  <button class="btn btn-primary btn-block">Siųsti kodą</button>
+</form>
+{% else %}
+<p class="muted">Kodą išsiuntėme adresu <b>{{ pending_email }}</b>. Jis galioja 10 minučių.</p>
+<form class="card" method="post" action="{{ url_for('verify_code') }}">
+  <label class="field"><span>Kodas</span>
+    <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="123456" required autofocus>
+  </label>
+  <button class="btn btn-primary btn-block">Prisijungti</button>
+</form>
+<div class="row">
+  <form method="post" action="{{ url_for('request_code') }}">
+    <input type="hidden" name="email" value="{{ pending_email }}">
+    <button class="btn btn-quiet">Siųsti kodą iš naujo</button>
+  </form>
+  <form method="post" action="{{ url_for('change_email') }}" style="text-align: right">
+    <button class="btn btn-quiet">Kitas el. paštas</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

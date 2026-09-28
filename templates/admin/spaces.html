@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% set tab = 'admin' %}
+{% set section = 'spaces' %}
+{% block title %}Vietos{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h1>Vietos</h1>
+
+{% for space in spaces %}
+<div class="card">
+  <div class="spread">
+    <h2 style="margin: 0">Nr. {{ space.number }}</h2>
+    <span class="badge">{{ 'Nuolatinė' if space.owner else 'Bendra' }}</span>
+  </div>
+  <form method="post" action="{{ url_for('admin_set_owner', number=space.number) }}" class="row" style="align-items: end">
+    <label class="field"><span>Nuolatinės vietos turėtojas</span>
+      <select name="owner_id">
+        <option value="">– bendra vieta –</option>
+        {% for c in colleagues %}<option value="{{ c.id }}" {{ 'selected' if c.name == space.owner }}>{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="btn btn-small" style="flex: 0 0 auto; margin-bottom: 12px">Išsaugoti</button>
+  </form>
+  {% for block in space.blocks %}
+    <div class="spread small">
+      <span class="badge danger">Užblokuota {{ block.first_day.isoformat() }} – {{ block.last_day.isoformat() if block.last_day else 'neribotai' }}</span>
+      <form method="post" action="{{ url_for('admin_unblock', block_id=block.id) }}">
+        <button class="btn btn-quiet small">Baigti</button>
+      </form>
+    </div>
+  {% endfor %}
+  <details>
+    <summary class="small muted">Užblokuoti vietą</summary>
+    <form method="post" action="{{ url_for('admin_block', number=space.number) }}"
+          onsubmit="return confirm('Rezervacijos bus perkeltos į kitas vietas arba atšauktos. Tęsti?')">
+      <div class="row">
+        <label class="field"><span>Nuo</span><input type="date" name="first_day" min="{{ today.isoformat() }}" required></label>
+        <label class="field"><span>Iki (tuščia – neribotai)</span><input type="date" name="last_day" min="{{ today.isoformat() }}"></label>
+      </div>
+      <button class="btn btn-danger btn-small">Užblokuoti</button>
+    </form>
+  </details>
+</div>
+{% else %}
+<p class="muted">Vietų dar nėra.</p>
+{% endfor %}
+
+<form class="card" method="post" action="{{ url_for('admin_spaces') }}">
+  <h2>Pridėti vietą</h2>
+  <div class="row">
+    <input name="number" placeholder="Numeris, pvz. 12" required>
+    <button class="btn btn-primary" style="flex: 0 0 auto">Pridėti</button>
+  </div>
+</form>
+{% endblock %}
