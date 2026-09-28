@@ -27,3 +27,12 @@ the first code). Paid instances allow 465 and 587, so never move this app to the
   credential that reaches customer data. Making the mailbox send-only (IMAP and POP off)
   was considered and declined on 2026-09-28. If the Render service is ever compromised,
   revoke the "parking" app password first.
+
+- Render is a stepping stone, not the final home: once the app has proved itself it moves to
+  finbee's own hosting. So the iPhone spike's Render service and repository were reused as they
+  were (decided 2026-09-28), and the app lives at `finbee-parking-spike.onrender.com` until then.
+  The move changes the app's address, which has three consequences. Every colleague has to
+  remove the Home Screen app, add it again and turn notifications back on, because push
+  subscriptions and sign-ins belong to an address. The data has to be carried across by copying
+  `parking.sqlite3` from the disk. And the new host must keep the same one-process shape (the
+  background loop) and be able to reach Gmail's SMTP.

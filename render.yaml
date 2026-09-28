@@ -1,10 +1,13 @@
-# Render blueprint for finbee parkavimas (ADR-0004). Starter, never free: the free plan sleeps,
+# Render blueprint for finbee parkavimas (ADR-0004). The service keeps the iPhone spike's name,
+# so Render updates that service in place rather than creating a second one; Render is a
+# stepping stone before finbee's own hosting, so its address doesn't need to be pretty.
+# Starter, never free: the free plan sleeps,
 # and it blocks outbound SMTP, so no sign-in code or notification email could be sent.
 # One worker: the background loop that sends notifications and the evening Reminder lives in
 # the process. The values marked sync: false are typed into Render's form, never committed.
 services:
   - type: web
-    name: finbee-parking
+    name: finbee-parking-spike
     runtime: python
     plan: starter
     region: frankfurt
