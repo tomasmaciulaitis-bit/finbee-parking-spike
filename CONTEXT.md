@@ -166,8 +166,9 @@ _LT_: laisvos vietos
 _Avoid_: free spaces, capacity, vacancy
 
 **Day View**:
-What every Colleague sees for today or an upcoming day: each Space, who holds it and
-when, and the Availability left. Of that day's Waitlist it shows only the length and the
+What every Colleague sees for today or an upcoming day: each Space open to Bookings that
+day (Shared Spaces, and Owned Spaces only while Released), who holds it and when, and the
+Availability left. It never names an Owner; only the Admin pages do. Of that day's Waitlist it shows only the length and the
 Colleague's own place.
 _LT_: dienos užimtumas
 _Avoid_: calendar, schedule, board

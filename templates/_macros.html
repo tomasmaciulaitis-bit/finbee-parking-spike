@@ -62,7 +62,7 @@
   <div class="space-body">
     <div class="spread">
       <span class="small muted">
-        {% if space.blocked %}Užblokuota{% elif space.owner %}Nuolatinė · {{ space.owner }}{% else %}Bendra{% endif %}{% if space.ev %} · {{ ev_mark() }}{% endif %}
+        {% if space.blocked %}Užblokuota{% elif space.owner %}Nuolatinė vieta{% if admin %} · {{ space.owner }}{% endif %}{% else %}Bendra{% endif %}{% if space.ev %} · {{ ev_mark() }}{% endif %}
       </span>
       {% if not space.blocked and not space.bookings and (not space.owner or space.released) %}
         <span class="badge ok">Laisva</span>

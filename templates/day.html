@@ -79,7 +79,9 @@
 
 <div class="card">
   <h2>Vietos</h2>
-  {% for space in view.spaces %}{{ space_row(space) }}{% endfor %}
+  {# Only the Spaces open to Bookings that day: a Shared Space, or an Owned one while Released. #}
+  {% for space in view.spaces if not space.blocked and (not space.owner or space.released) %}{{ space_row(space) }}
+  {% else %}<p class="muted">Šią dieną rezervuoti vietų nėra.</p>{% endfor %}
 </div>
 
 <form class="card" method="get" action="{{ request.path }}">

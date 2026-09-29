@@ -1,3 +1,4 @@
+import re
 import shutil
 import sys
 import tempfile
@@ -226,6 +227,22 @@ class AppTest(unittest.TestCase):
         page = client.post("/rezervuoti", data={"day": "2026-10-05", "kind": "whole"},
                            follow_redirects=True).get_data(as_text=True)
         self.assertEqual(("Rezervuota" in page, "jau turite rezervaciją" in page), (True, False))
+
+    def test_the_day_lists_only_bookable_spaces_and_never_who_owns_one(self):
+        tuesday = date(2026, 10, 6)
+        owner = self.garage.register("vadovas.a@finbeeverslui.lt", "Vadovas A", [], phone="+370 600 00001")
+        other = self.garage.register("vadovas.b@finbeeverslui.lt", "Vadovas B", [], phone="+370 600 00002")
+        for number in ("1", "2", "3"):
+            self.garage.add_space(self.admin, number)
+        self.garage.set_owner(self.admin, "1", owner)
+        self.garage.set_owner(self.admin, "2", other)
+        self.garage.release(owner, tuesday, "12:00", "20:00")
+        self.garage.block_space(self.admin, "3", tuesday)
+        page = self.signed_in("ona@finbeeverslui.lt", name="Ona").get("/diena/2026-10-06").get_data(as_text=True)
+        admin_day = self.signed_in("admin@finbeeverslui.lt").get("/admin/diena/2026-10-06").get_data(as_text=True)
+        listed = re.findall(r'<div class="space-number">([^<]+)</div>', page)
+        self.assertEqual((sorted(listed), "Vadovas" in page, "Vadovas A" in admin_day),
+                         (["1", "12"], False, True))
 
     def test_a_form_posted_from_another_site_is_refused(self):
         client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
