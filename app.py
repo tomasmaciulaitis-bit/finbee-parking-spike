@@ -58,6 +58,11 @@ MESSAGES = {
     "too_soon": "Kodą ką tik išsiuntėme – palaukite minutę ir bandykite vėl.",
     "bad_phone": "Įrašykite telefono numerį po +370, pvz., 612 34567.",
     "no_guest": "Įrašykite svečio vardą arba įmonę.",
+    "bad_number": "Įrašykite vietos numerį.",
+    "space_exists": "Tokia vieta jau yra.",
+    "owned_space": "Nuolatinės vietos ištrinti negalima – pirmiausia padarykite ją bendra.",
+    "space_used": "Šioje vietoje jau buvo rezervacijų, todėl jos ištrinti negalima. "
+                  "Jei vietos nebeliko, užblokuokite ją neribotam laikui.",
 }
 CODE_EMAIL = ("Jūsų parkavimo programėlės prisijungimo kodas: %s\n\n"
               "Kodas galioja 10 minučių. Jei jo neprašėte, šį laišką tiesiog ištrinkite.\n")
@@ -554,14 +559,10 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         if request.method == "POST":
             number = request.form.get("number", "").strip()
             try:
-                if not number:
-                    raise Refused("not_found")
                 garage.add_space(g.me, number)
                 flash("Vieta Nr. %s pridėta." % number)
             except Refused as error:
                 refused(error)
-            except Exception:
-                flash("Tokia vieta jau yra.", "error")
             return redirect(url_for("admin_spaces"))
         return render_template("admin/spaces.html", spaces=garage.spaces(),
                                colleagues=[c for c in garage.colleagues() if c.active])
@@ -574,6 +575,29 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         try:
             garage.set_owner(g.me, number, owner)
             flash("Vieta Nr. %s: %s." % (number, "nuolatinė – " + owner.name if owner else "bendra"))
+        except Refused as error:
+            refused(error)
+        return redirect(url_for("admin_spaces"))
+
+    @app.post("/admin/vietos/<number>/pervadinti")
+    @admin_only
+    def admin_rename_space(number):
+        new_number = request.form.get("new_number", "").strip()
+        try:
+            told = garage.rename_space(g.me, number, new_number)
+            if new_number != number:
+                flash("Vieta Nr. %s dabar – Nr. %s.%s" % (
+                    number, new_number, " Ją rezervavusiems kolegoms pranešta." if told else ""))
+        except Refused as error:
+            refused(error)
+        return redirect(url_for("admin_spaces"))
+
+    @app.post("/admin/vietos/<number>/istrinti")
+    @admin_only
+    def admin_delete_space(number):
+        try:
+            garage.delete_space(g.me, number)
+            flash("Vieta Nr. %s ištrinta." % number)
         except Refused as error:
             refused(error)
         return redirect(url_for("admin_spaces"))

@@ -436,12 +436,59 @@ class AdminTest(GarageTest):
                    "set_owner": lambda: self.garage.set_owner(ona, "7", ona),
                    "close_day": lambda: self.garage.close_day(ona, TUESDAY),
                    "block_space": lambda: self.garage.block_space(ona, "7", TUESDAY),
+                   "rename_space": lambda: self.garage.rename_space(ona, "7", "70"),
+                   "delete_space": lambda: self.garage.delete_space(ona, "7"),
                    "set_rules": lambda: self.garage.set_rules(ona, 7, "09:00", "07:00", "20:00", 5)}
         for name, action in actions.items():
             with self.subTest(action=name):
                 with self.assertRaises(Refused) as refused:
                     action()
                 self.assertEqual(refused.exception.code, "not_allowed")
+
+
+class SpaceNumberTest(GarageTest):
+    def test_renaming_a_space_keeps_its_bookings_and_tells_whoever_holds_or_owns_it(self):
+        self.spaces("21", "5")
+        ona, jonas = self.colleague("Ona"), self.colleague("Jonas")
+        self.garage.set_owner(self.admin, "5", jonas)
+        self.garage.book(ona, TUESDAY)
+        self.garage.rename_space(self.admin, "21", "12")
+        self.garage.rename_space(self.admin, "5", "6")
+        told = sorted((n.colleague_id, n.body) for n in self.garage.pending_notifications())
+        self.assertEqual(([b.space for b in self.garage.my_bookings(ona).upcoming], self.garage.my_space(jonas).number,
+                          [(who, "Nr. 12" in body or "Nr. 6" in body) for who, body in told]),
+                         (["12"], "6", [(ona.id, True), (jonas.id, True)]))
+
+    def test_a_space_cannot_take_another_spaces_number_or_no_number(self):
+        self.spaces("1", "2")
+        codes = []
+        for new in ("2", "  "):
+            try:
+                self.garage.rename_space(self.admin, "1", new)
+            except Refused as error:
+                codes.append(error.code)
+        for new in ("1", ""):
+            try:
+                self.garage.add_space(self.admin, new)
+            except Refused as error:
+                codes.append(error.code)
+        self.assertEqual(codes, ["space_exists", "bad_number", "space_exists", "bad_number"])
+
+    def test_only_a_space_never_booked_and_not_owned_can_be_deleted(self):
+        self.spaces("1", "2", "3")
+        self.garage.book(self.colleague("Ona"), TUESDAY)  # takes Space 1
+        self.garage.set_owner(self.admin, "2", self.colleague("Jonas"))
+        deletable = {s.number: s.deletable for s in self.garage.spaces()}
+        codes = []
+        for number in ("1", "2"):
+            try:
+                self.garage.delete_space(self.admin, number)
+            except Refused as error:
+                codes.append(error.code)
+        self.garage.block_space(self.admin, "3", TUESDAY)
+        self.garage.delete_space(self.admin, "3")
+        self.assertEqual((deletable, codes, [s.number for s in self.garage.spaces()]),
+                         ({"1": False, "2": False, "3": True}, ["space_used", "owned_space"], ["1", "2"]))
 
 
 class AdminOverviewTest(GarageTest):

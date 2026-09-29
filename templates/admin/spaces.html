@@ -40,6 +40,23 @@
       <button class="btn btn-danger btn-small">Užblokuoti</button>
     </form>
   </details>
+  <details>
+    <summary class="small muted">Pervadinti arba ištrinti</summary>
+    <form method="post" action="{{ url_for('admin_rename_space', number=space.number) }}" class="row" style="align-items: end">
+      <label class="field"><span>Naujas numeris</span><input name="new_number" value="{{ space.number }}" required></label>
+      <button class="btn btn-small" style="flex: 0 0 auto; margin-bottom: 12px">Pervadinti</button>
+    </form>
+    {% if space.deletable %}
+    <form method="post" action="{{ url_for('admin_delete_space', number=space.number) }}"
+          onsubmit="return confirm('Ištrinti vietą Nr. {{ space.number }}?')">
+      <button class="btn btn-danger btn-small">Ištrinti vietą</button>
+    </form>
+    {% elif space.owner %}
+    <p class="small muted">Nuolatinės vietos ištrinti negalima – pirmiausia padarykite ją bendra.</p>
+    {% else %}
+    <p class="small muted">Šioje vietoje jau buvo rezervacijų, todėl jos ištrinti negalima. Jei vietos nebeliko, užblokuokite ją neribotam laikui.</p>
+    {% endif %}
+  </details>
 </div>
 {% else %}
 <p class="muted">Vietų dar nėra.</p>

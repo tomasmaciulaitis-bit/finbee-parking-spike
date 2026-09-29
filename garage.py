@@ -301,6 +301,7 @@ class SpaceInfo:
     number: str
     owner: object   # the Owner's name, or None for a Shared Space
     blocks: list    # [Block] that haven't ended
+    deletable: bool = False  # never booked and not Owned: added by mistake, so it can go
 
 
 @dataclass(frozen=True)
@@ -421,9 +422,67 @@ class Garage:
     def add_space(self, actor, number):
         with self._lock, self._db:
             self._require_admin(actor)
-            self._db.execute("INSERT INTO spaces (number) VALUES (?)", (number,))
+            self._db.execute("INSERT INTO spaces (number) VALUES (?)", (self._new_number(number),))
             for day in self._open_days():
                 self._promote(day)
+
+    def _new_number(self, number):
+        """A Space number that is given and isn't already another Space's."""
+        number = (number or "").strip()
+        if not number:
+            raise Refused("bad_number")
+        if self._db.execute("SELECT 1 FROM spaces WHERE number = ?", (number,)).fetchone():
+            raise Refused("space_exists")
+        return number
+
+    def rename_space(self, actor, number, new_number):
+        """Give a Space the number painted on it. Its Bookings keep it, so whoever holds one
+        that hasn't ended, and its Owner, are told the new number. Returns how many were."""
+        with self._lock, self._db:
+            self._require_admin(actor)
+            space = self._db.execute("SELECT id, owner_id FROM spaces WHERE number = ?", (number,)).fetchone()
+            if space is None:
+                raise Refused("not_found")
+            if (new_number or "").strip() == number:
+                return 0
+            new_number = self._new_number(new_number)
+            self._db.execute("UPDATE spaces SET number = ? WHERE id = ?", (new_number, space["id"]))
+            today, now_min = self._today()
+            held = self._db.execute(
+                "SELECT * FROM bookings WHERE space_id = :space "
+                "AND (day > :today OR (day = :today AND end_min > :now)) ORDER BY day, start_min",
+                {"space": space["id"], "today": today, "now": now_min}).fetchall()
+            for row in held:
+                when = "%s, %s" % (lt.sentence(lt.day_label(date.fromisoformat(row["day"]))), self._times(row))
+                if row["guest_name"] is None:
+                    self._notify(row["colleague_id"], "Jūsų vietos numeris pakeistas",
+                                 "%s: jūsų vieta dabar – Nr. %s (buvo Nr. %s). Vieta ta pati." % (
+                                     when, new_number, number))
+                else:
+                    self._notify(row["colleague_id"], "Svečio vietos numeris pakeistas",
+                                 "%s: svečio vieta dabar – Nr. %s (buvo Nr. %s). Svečias: %s." % (
+                                     when, new_number, number, row["guest_name"]))
+            if space["owner_id"] is not None:
+                self._notify(space["owner_id"], "Jūsų nuolatinės vietos numeris pakeistas",
+                             "Jūsų nuolatinė vieta dabar – Nr. %s (buvo Nr. %s). Vieta ta pati." % (
+                                 new_number, number))
+            return len(held) + (space["owner_id"] is not None)
+
+    def delete_space(self, actor, number):
+        """Remove a Space added by mistake. Only one never booked and not Owned can go: a Space
+        that has been booked keeps its history, so it is retired by Blocking it instead."""
+        with self._lock, self._db:
+            self._require_admin(actor)
+            space = self._db.execute("SELECT id, owner_id FROM spaces WHERE number = ?", (number,)).fetchone()
+            if space is None:
+                raise Refused("not_found")
+            if space["owner_id"] is not None:
+                raise Refused("owned_space")
+            if self._db.execute("SELECT 1 FROM bookings WHERE space_id = ?", (space["id"],)).fetchone():
+                raise Refused("space_used")
+            for table in ("releases", "blocks"):
+                self._db.execute("DELETE FROM %s WHERE space_id = ?" % table, (space["id"],))
+            self._db.execute("DELETE FROM spaces WHERE id = ?", (space["id"],))
 
     def set_owner(self, actor, number, owner):
         """Make a Space an Owned Space held by `owner`, or a Shared Space again with None. A new
@@ -777,7 +836,9 @@ class Garage:
                 blocks.setdefault(row["space_id"], []).append(Block(
                     row["id"], row["number"], date.fromisoformat(row["first_day"]),
                     row["last_day"] and date.fromisoformat(row["last_day"])))
-            spaces = [SpaceInfo(row["number"], row["owner"], blocks.get(row["id"], []))
+            used = {row["space_id"] for row in self._db.execute("SELECT DISTINCT space_id FROM bookings")}
+            spaces = [SpaceInfo(row["number"], row["owner"], blocks.get(row["id"], []),
+                                row["owner"] is None and row["id"] not in used)
                       for row in self._db.execute(
                           "SELECT s.id, s.number, c.name AS owner FROM spaces s "
                           "LEFT JOIN colleagues c ON c.id = s.owner_id")]

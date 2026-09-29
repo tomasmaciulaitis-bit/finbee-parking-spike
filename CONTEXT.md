@@ -13,7 +13,10 @@ and emails use for it, every time.
 
 **Space**:
 One numbered parking bay in the office's underground garage that finbee allocates,
-identified by the number painted on it. Nine today.
+identified by the number painted on it. Nine today. An Admin can change a Space's number to
+match what's painted, and whoever holds or owns it is told; the Space itself, and its
+Bookings, stay the same. A Space added by mistake can be deleted only if it was never booked
+and isn't an Owned Space; any other Space that goes is retired by Blocking it.
 _LT_: vieta
 _Avoid_: spot, slot, bay, place
 

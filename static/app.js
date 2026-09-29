@@ -199,3 +199,66 @@
     try { localStorage.setItem('installBannerHiddenUntil', String(Date.now() + 30 * 24 * 3600 * 1000)); } catch (e) {}
   });
 })();
+
+// Pull to refresh, for the installed app only: a Home Screen app has no reload button and no
+// pull-to-refresh of its own, while a browser tab keeps the browser's.
+(function () {
+  var READY = 70, MOST = 110;
+  var indicator = null, startX = 0, startY = 0, pull = 0, tracking = false, pulling = false;
+  function installed() {  // asked at each touch, so nothing is decided before the page is used
+    return navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  }
+  function show(distance) {
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.className = 'ptr';
+      indicator.setAttribute('aria-hidden', 'true');
+      indicator.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg>';
+      document.body.appendChild(indicator);
+    }
+    indicator.classList.add('dragging');
+    indicator.classList.toggle('ready', distance >= READY);
+    indicator.style.opacity = String(Math.min(1, distance / READY));
+    indicator.style.transform = 'translate(-50%, ' + distance + 'px) rotate(' + distance * 3 + 'deg)';
+  }
+  function hide() {
+    if (!indicator) return;
+    indicator.classList.remove('dragging', 'ready');
+    indicator.style.opacity = '0';
+    indicator.style.transform = '';
+  }
+  document.addEventListener('touchstart', function (e) {
+    tracking = e.touches.length === 1 && window.scrollY <= 0 && installed();
+    pulling = false;
+    pull = 0;
+    if (tracking) { startX = e.touches[0].clientX; startY = e.touches[0].clientY; }
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!tracking) return;
+    var dx = e.touches[0].clientX - startX, dy = e.touches[0].clientY - startY;
+    if (!pulling) {
+      if (dy < 0 || Math.abs(dx) > dy) {  // scrolling up or sideways (the day chips), not pulling
+        if (dy < -8 || Math.abs(dx) > 8) tracking = false;
+        return;
+      }
+      if (dy < 10 || window.scrollY > 0) return;
+      pulling = true;
+    }
+    e.preventDefault();  // the indicator follows the finger instead of the page bouncing
+    pull = Math.min(MOST, (dy - 10) * 0.55);
+    show(pull);
+  }, { passive: false });
+  document.addEventListener('touchend', function () {
+    tracking = false;
+    if (!pulling) return;
+    pulling = false;
+    if (pull >= READY) {
+      indicator.classList.remove('dragging');
+      indicator.classList.add('spinning');
+      location.replace(location.href.split('#')[0]);  // a fresh GET, never a re-sent form
+    } else {
+      hide();
+    }
+  });
+  document.addEventListener('touchcancel', function () { tracking = pulling = false; hide(); });
+})();

@@ -179,6 +179,20 @@ class AppTest(unittest.TestCase):
         self.assertEqual(("Išvažiuoju" in before, "Išvažiuoju" in after, "Jūsų rezervacija" in after),
                          (True, False, False))
 
+    def test_an_admin_renames_and_deletes_spaces_on_the_spaces_page(self):
+        admin = self.signed_in("admin@finbeeverslui.lt")
+        admin.post("/admin/vietos/12/pervadinti", data={"new_number": "21"})
+        admin.post("/admin/vietos", data={"number": "99"})
+        admin.post("/admin/vietos/99/istrinti")
+        page = admin.get("/admin/vietos").get_data(as_text=True)
+        self.assertEqual(([s.number for s in self.garage.spaces()], "Pervadinti" in page), (["21"], True))
+
+    def test_only_admins_rename_or_delete_spaces(self):
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        codes = [client.post("/admin/vietos/12/pervadinti", data={"new_number": "21"}).status_code,
+                 client.post("/admin/vietos/12/istrinti").status_code]
+        self.assertEqual((codes, [s.number for s in self.garage.spaces()]), ([403, 403], ["12"]))
+
     def test_a_form_posted_from_another_site_is_refused(self):
         client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
         response = client.post("/rezervuoti", data={"day": "2026-10-06", "kind": "whole"},
