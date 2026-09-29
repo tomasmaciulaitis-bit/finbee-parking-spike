@@ -6,7 +6,7 @@
 {% set add_icon %}<svg class="ico" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M12 8.5v7M8.5 12h7"/></svg>{% endset %}
 {% set android = variant == 'android' %}
 {% block content %}
-<img class="brand" src="{{ url_for('static', filename='finbee-logo.svg') }}" alt="finbee">
+<img class="brand" src="{{ asset('finbee-logo.svg') }}" alt="finbee">
 <h1>Pridėkite prie pradžios ekrano</h1>
 {% if android %}
 <p class="muted">Įdiekite Parkavimą – jis atsidarys iš pradžios ekrano kaip įprasta programėlė.</p>
@@ -33,7 +33,7 @@
       <div class="adialog">
         <b>Install app</b>
         <div class="adialog-app">
-          <img src="{{ url_for('static', filename='icon-192.png') }}" alt="">
+          <img src="{{ asset('icon-192.png') }}" alt="">
           <div><b>Parkavimas</b><div class="caption">{{ host }}</div></div>
         </div>
         <div class="adialog-actions"><span>Cancel</span><span class="ainstall" data-target="ainstall">Install</span></div>
@@ -72,7 +72,7 @@
     <div class="dialog">
       <div class="dlg-bar"><span>Cancel</span>Add to Home Screen<span class="dlg-add" data-target="confirm">Add</span></div>
       <div class="dlg-app">
-        <img src="{{ url_for('static', filename='icon-180.png') }}" alt="">
+        <img src="{{ asset('icon-180.png') }}" alt="">
         <div><b>Parkavimas</b><div class="caption">{{ host }}</div></div>
       </div>
       {% if variant == 'menu' %}<div class="dlg-toggle">Open as Web App <i class="switch"></i></div>{% endif %}
@@ -80,7 +80,7 @@
     {% endif %}
     <div class="home {{ 'round' if android }}">
       {% for _ in range(9) %}<i></i>{% endfor %}
-      <div class="app" data-target="open"><img src="{{ url_for('static', filename='icon-180.png') }}" alt=""><span>Parkavimas</span></div>
+      <div class="app" data-target="open"><img src="{{ asset('icon-180.png') }}" alt=""><span>Parkavimas</span></div>
       {% for _ in range(6) %}<i></i>{% endfor %}
     </div>
     <div class="finger"></div>

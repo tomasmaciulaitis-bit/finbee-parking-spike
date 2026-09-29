@@ -8,11 +8,11 @@
 <link rel="apple-touch-icon" href="/static/icon-180.png">
 <meta name="theme-color" content="#f2f2f2">
 <meta name="apple-mobile-web-app-title" content="Parkavimas">
-<link rel="icon" href="{{ url_for('static', filename='icon-192.png') }}">
+<link rel="icon" href="{{ asset('icon-192.png') }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
 <body>
 <main>
@@ -44,7 +44,7 @@
      browser's own install window where there is one, else the animated guide. #}
   <div id="install-banner" class="card install-banner" hidden>
     <div class="spread" style="justify-content: flex-start">
-      <img src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="44" height="44">
+      <img src="{{ asset('icon-192.png') }}" alt="" width="44" height="44">
       <div><b>Įdiekite programėlę</b>
         <div class="caption">Parkavimas atsidarys iš pradžios ekrano kaip įprasta programėlė.</div></div>
     </div>
@@ -79,6 +79,6 @@
   {% endif %}
 </nav>
 {% endif %}
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ asset('app.js') }}"></script>
 </body>
 </html>

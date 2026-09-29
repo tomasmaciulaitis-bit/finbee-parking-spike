@@ -82,6 +82,13 @@ def load_secret(data_dir):
     return path.read_text().strip()
 
 
+class ParkingFlask(Flask):
+    def get_send_file_max_age(self, filename):
+        """A static file asked for with its version (asset() adds ?v=…) is kept by the phone for
+        a year, because the next update links a new version. Anything else is checked each time."""
+        return 365 * 24 * 3600 if request.args.get("v") else None
+
+
 def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None, send_push=None,
                send_email=None, background=True, secret_key=None, cookie_secure=False, app_url=""):
     data_dir = Path(data_dir)
@@ -101,7 +108,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
     notifier = notify.Notifier(garage, send_push=send_push,
                                send_email=lambda to, subject, body: send_email(to, subject, body + footer))
 
-    app = Flask(__name__)
+    app = ParkingFlask(__name__)
     app.secret_key = secret_key or load_secret(data_dir)
     app.config.update(GARAGE=garage, PERMANENT_SESSION_LIFETIME=timedelta(days=90),
                       SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=cookie_secure,
@@ -162,6 +169,10 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         elif len(digits) == 9 and digits.startswith("8"):
             digits = digits[1:]
         return "+370" + digits if digits else ""
+
+    def asset(filename):
+        """A static file's URL with its version, so phones keep it until an update changes it."""
+        return url_for("static", filename=filename, v=int(os.stat(HERE / "static" / filename).st_mtime))
 
     def plate_list(form):
         """Every Number Plate typed, one per field; a comma, semicolon or "ir" also separates them."""
@@ -243,7 +254,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
     @app.context_processor
     def template_helpers():
         me = g.get("me")
-        return {"me": me, "has_push": bool(me and garage.push_subscriptions(me.id)),
+        return {"me": me, "has_push": bool(me and garage.push_subscriptions(me.id)), "asset": asset,
                 "lt": lt, "day_label_short": day_label_short,
                 "position": position, "vapid_public": vapid_public, "today": now().date(),
                 "now_hhmm": now().strftime("%H:%M")}

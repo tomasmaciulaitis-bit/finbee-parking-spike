@@ -45,17 +45,26 @@
       if (!response.ok) throw new Error('HTTP ' + response.status);
     });
   }
-  // 'on', 'off' or 'blocked'. Never settles where no service worker becomes ready.
-  function state() {
+  // 'on', 'off' or 'blocked'. Never settles where no service worker becomes ready. With `sync`
+  // it also re-sends this device's subscription, in case the server lost it.
+  function state(sync) {
     return navigator.serviceWorker.ready.then(function (reg) {
       return reg.pushManager.getSubscription();
     }).then(function (existing) {
       if (existing && Notification.permission === 'granted') {
-        send(existing).catch(function () {});  // keeps the server's copy fresh
+        if (sync) send(existing).catch(function () {});
         return 'on';
       }
       return Notification.permission === 'denied' ? 'blocked' : 'off';
     });
+  }
+  function syncDue() {  // once a day is enough to heal a lost copy; every page would be waste
+    try {
+      var last = Number(localStorage.getItem('pushSyncedAt')) || 0;
+      if (Date.now() - last < 24 * 3600 * 1000) return false;
+      localStorage.setItem('pushSyncedAt', String(Date.now()));
+    } catch (e) {}
+    return true;
   }
   // Must run from a tap: Safari only asks for permission then.
   function enable(key) {
@@ -83,7 +92,7 @@
       setTimeout(function () {  // no service worker ever became ready (blocked or failed)
         if (status.textContent === 'Tikrinama…') status.textContent = 'Šiame įrenginyje pranešimai neveikia.';
       }, 3000);
-      state().then(show);
+      state(true).then(show);
       button.addEventListener('click', function () {
         enable(button.dataset.key).then(function (s) {
           if (s === 'off') status.textContent = 'Leidimas nesuteiktas.'; else show(s);
@@ -110,7 +119,7 @@
     if (/iPhone|iPod/.test(navigator.userAgent) && !standalone && !reachable) offer('install');
     return;
   }
-  state().then(offer);
+  state(!reachable || syncDue()).then(offer);
   var enableButton = nudge.querySelector('[data-enable]');
   var error = nudge.querySelector('[data-error]');
   enableButton.addEventListener('click', function () {
@@ -201,7 +210,9 @@
 })();
 
 // Pull to refresh, for the installed app only: a Home Screen app has no reload button and no
-// pull-to-refresh of its own, while a browser tab keeps the browser's.
+// pull-to-refresh of its own, while a browser tab keeps the browser's. Every listener is
+// passive: it only watches the finger, so scrolling never waits for this script (on iPhone
+// the page's own bounce moves the content down while the badge shows).
 (function () {
   var READY = 70, MOST = 110;
   var indicator = null, startX = 0, startY = 0, pull = 0, tracking = false, pulling = false;
@@ -244,10 +255,9 @@
       if (dy < 10 || window.scrollY > 0) return;
       pulling = true;
     }
-    e.preventDefault();  // the indicator follows the finger instead of the page bouncing
     pull = Math.min(MOST, (dy - 10) * 0.55);
     show(pull);
-  }, { passive: false });
+  }, { passive: true });
   document.addEventListener('touchend', function () {
     tracking = false;
     if (!pulling) return;
@@ -259,6 +269,6 @@
     } else {
       hide();
     }
-  });
-  document.addEventListener('touchcancel', function () { tracking = pulling = false; hide(); });
+  }, { passive: true });
+  document.addEventListener('touchcancel', function () { tracking = pulling = false; hide(); }, { passive: true });
 })();

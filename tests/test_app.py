@@ -193,6 +193,14 @@ class AppTest(unittest.TestCase):
                  client.post("/admin/vietos/12/istrinti").status_code]
         self.assertEqual((codes, [s.number for s in self.garage.spaces()]), ([403, 403], ["12"]))
 
+    def test_the_phone_keeps_a_versioned_file_until_the_next_update_and_rechecks_the_rest(self):
+        page = self.app.test_client().get("/").get_data(as_text=True)
+        version = page.split('href="/static/app.css?v=', 1)[1].split('"', 1)[0]
+        client = self.app.test_client()
+        kept = client.get("/static/app.css?v=" + version).headers.get("Cache-Control", "")
+        checked = client.get("/static/app.css").headers.get("Cache-Control", "")
+        self.assertEqual(("max-age=31536000" in kept, checked), (True, "no-cache"))
+
     def test_a_form_posted_from_another_site_is_refused(self):
         client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
         response = client.post("/rezervuoti", data={"day": "2026-10-06", "kind": "whole"},

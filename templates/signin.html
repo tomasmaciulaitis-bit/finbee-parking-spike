@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Prisijungimas{% endblock %}
 {% block content %}
-<img class="brand" src="{{ url_for('static', filename='finbee-logo.svg') }}" alt="finbee">
+<img class="brand" src="{{ asset('finbee-logo.svg') }}" alt="finbee">
 <h1>Prisijunkite</h1>
 {% if not pending_email %}
 <p class="muted">Įveskite darbo el. paštą – atsiųsime 6 skaitmenų kodą.</p>
