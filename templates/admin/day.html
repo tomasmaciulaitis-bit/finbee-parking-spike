@@ -7,6 +7,7 @@
 {% include "admin/_nav.html" %}
 <h1>{{ lt.sentence(lt.day_label(day)) }}</h1>
 {{ day_picker(days, day, 'admin_day') }}
+<p><a class="btn btn-outline btn-small" href="{{ url_for('admin_guests', diena=day.isoformat()) }}">+ Rezervuoti svečiui</a></p>
 
 <div class="card">
   <h2>Vietos</h2>

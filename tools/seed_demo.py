@@ -43,4 +43,8 @@ for i, person in enumerate(people):
                 pass
 if len(days) > 1:
     garage.release(heads[1], days[1], "12:00", "20:00")
+    try:
+        garage.book_guest(admin, days[1], "UAB Demo Klientas", plate="SVC 001", start="10:00", end="14:00")
+    except Refused:
+        pass
 print("seeded", data, "for", ", ".join(d.isoformat() for d in days[1:3]))

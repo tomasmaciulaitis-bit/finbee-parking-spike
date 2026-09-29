@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import period_fields with context %}
+{% set tab = 'admin' %}
+{% set section = 'guests' %}
+{% block title %}Svečiai{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h1>Svečiai</h1>
+<p class="muted">Svečiui galite rezervuoti laisvą vietą bet kurią būsimą darbo dieną ir kiek kartų reikia:
+  rezervacijų limitas ir išankstinio rezervavimo laikotarpis svečiams netaikomi.</p>
+
+<form class="card" method="post" action="{{ url_for('admin_guests') }}" data-period>
+  <h2>Rezervuoti svečiui</h2>
+  <label class="field"><span>Svečias</span>
+    <input name="guest" placeholder="Vardas ir pavardė arba įmonė" value="{{ form.guest }}" required>
+  </label>
+  <label class="field"><span>Automobilio valstybinis numeris (nebūtina)</span>
+    <input name="plate" autocapitalize="characters" autocomplete="off" placeholder="ABC 123" value="{{ form.plate }}">
+  </label>
+  <label class="field"><span>Diena</span>
+    <input name="day" type="date" min="{{ today.isoformat() }}" value="{{ form.day }}" required>
+  </label>
+  {{ period_fields(starts, ends, form.kind, form.start, form.end) }}
+  <button class="btn btn-primary btn-block">Rezervuoti</button>
+  <p class="small muted">Vietą parinksime iš laisvų. Jei laisvos vietos nėra, rezervuoti nepavyks: svečiai eilėje nelaukia.
+    Kolegos svečią matys dienos užimtume, o pagal numerį ras, kas jam rezervavo vietą.</p>
+</form>
+
+<div class="card">
+  <h2>Būsimi svečiai</h2>
+  {% if guests %}
+  <ul class="list">
+    {% for booking in guests %}
+    <li class="spread">
+      <div>
+        <b>{{ booking.guest }}</b>{% if booking.plate %} <span class="badge">{{ booking.plate }}</span>{% endif %}
+        <div class="small muted">{{ lt.sentence(lt.day_label(booking.day)) }}, {{ booking.start }}–{{ booking.end }} · vieta Nr. {{ booking.space }} · rezervavo {{ booking.host.name }}</div>
+      </div>
+      <form method="post" action="{{ url_for('admin_cancel', booking_id=booking.id) }}"
+            onsubmit="return confirm('Atšaukti svečio rezervaciją?')">
+        <input type="hidden" name="next" value="{{ url_for('admin_guests') }}">
+        <button class="btn btn-quiet">Atšaukti</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">Svečių rezervacijų nėra.</p>
+  {% endif %}
+</div>
+{% endblock %}

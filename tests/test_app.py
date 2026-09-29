@@ -138,6 +138,47 @@ class AppTest(unittest.TestCase):
         self.assertEqual(('data-reachable="no"' in before, 'data-reachable="yes"' in after,
                           'id="push-nudge"' in profile), (True, True, False))
 
+    def test_the_phone_field_takes_the_number_after_a_fixed_370(self):
+        client = self.verified("ona@finbeeverslui.lt")
+        page = client.get("/registracija").get_data(as_text=True)
+        client.post("/registracija", data={"name": "Ona", "phone": "612 34567", "plates": "ABC 123"})
+        profile = client.get("/profilis").get_data(as_text=True)
+        self.assertEqual(('class="phone-prefix">+370<' in page,
+                          self.garage.colleague_by_email("ona@finbeeverslui.lt").phone,
+                          'value="612 34567"' in profile), (True, "+37061234567", True))
+
+    def test_an_admin_books_a_space_for_a_guest_and_colleagues_see_it(self):
+        admin = self.signed_in("admin@finbeeverslui.lt")
+        admin.post("/admin/sveciai", data={"day": "2026-10-06", "kind": "whole", "guest": "UAB Klientas",
+                                           "plate": "GST 001"})
+        guests = admin.get("/admin/sveciai").get_data(as_text=True)
+        day = self.signed_in("ona@finbeeverslui.lt", name="Ona").get("/diena/2026-10-06").get_data(as_text=True)
+        self.assertEqual(("UAB Klientas" in guests, "GST001" in guests, "Svečias – UAB Klientas" in day),
+                         (True, True, True))
+
+    def test_only_admins_book_for_guests(self):
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        response = client.post("/admin/sveciai", data={"day": "2026-10-06", "kind": "whole", "guest": "X"})
+        self.assertEqual((response.status_code, self.garage.guest_bookings()), (403, []))
+
+    def test_the_plate_search_finds_a_guests_car_and_the_admin_to_call(self):
+        self.garage.book_guest(self.admin, date(2026, 10, 6), "UAB Klientas", plate="GST 001")
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        page = client.get("/diena/2026-10-06?numeris=gst001").get_data(as_text=True)
+        self.assertEqual(("UAB Klientas" in page, 'href="tel:+37060000000"' in page), (True, True))
+
+    def test_after_leaving_the_day_no_longer_shows_the_booking_to_leave_again(self):
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        client.post("/rezervuoti", data={"day": "2026-10-05", "kind": "whole"})
+        ona = self.garage.colleague_by_email("ona@finbeeverslui.lt")
+        [booking] = self.garage.my_bookings(ona).upcoming
+        self.clock.set(date(2026, 10, 5), "10:10")
+        before = client.get("/diena/2026-10-05").get_data(as_text=True)
+        client.post("/atsaukti/%d" % booking.id)
+        after = client.get("/diena/2026-10-05").get_data(as_text=True)
+        self.assertEqual(("Išvažiuoju" in before, "Išvažiuoju" in after, "Jūsų rezervacija" in after),
+                         (True, False, False))
+
     def test_a_form_posted_from_another_site_is_refused(self):
         client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
         response = client.post("/rezervuoti", data={"day": "2026-10-06", "kind": "whole"},

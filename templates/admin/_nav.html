@@ -1,6 +1,7 @@
 <p class="eyebrow">Administravimas</p>
 <nav class="subnav">
   <a href="{{ url_for('admin_home') }}" class="{{ 'active' if section == 'day' }}">Diena</a>
+  <a href="{{ url_for('admin_guests') }}" class="{{ 'active' if section == 'guests' }}">Svečiai</a>
   <a href="{{ url_for('admin_spaces') }}" class="{{ 'active' if section == 'spaces' }}">Vietos</a>
   <a href="{{ url_for('admin_rules') }}" class="{{ 'active' if section == 'rules' }}">Taisyklės</a>
   <a href="{{ url_for('admin_days') }}" class="{{ 'active' if section == 'days' }}">Uždarytos dienos</a>

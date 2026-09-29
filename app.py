@@ -56,7 +56,8 @@ MESSAGES = {
     "expired": "Kodas nebegalioja – paprašykite naujo.",
     "too_many_tries": "Per daug bandymų – paprašykite naujo kodo.",
     "too_soon": "Kodą ką tik išsiuntėme – palaukite minutę ir bandykite vėl.",
-    "bad_phone": "Įrašykite telefono numerį, pvz., +370 612 34567.",
+    "bad_phone": "Įrašykite telefono numerį po +370, pvz., 612 34567.",
+    "no_guest": "Įrašykite svečio vardą arba įmonę.",
 }
 CODE_EMAIL = ("Jūsų parkavimo programėlės prisijungimo kodas: %s\n\n"
               "Kodas galioja 10 minučių. Jei jo neprašėte, šį laišką tiesiog ištrinkite.\n")
@@ -146,6 +147,16 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         if form.get("kind") == "part":
             return form.get("start") or "", form.get("end") or ""
         return None, None
+
+    def phone_from(form):
+        """The Phone Number from the field after its fixed +370: '612 34567', or the
+        '8 612 34567' and '+370 612 34567' people type out of habit."""
+        digits = "".join(ch for ch in form.get("phone", "") if ch.isdigit())
+        if len(digits) == 11 and digits.startswith("370"):
+            digits = digits[3:]
+        elif len(digits) == 9 and digits.startswith("8"):
+            digits = digits[1:]
+        return "+370" + digits if digits else ""
 
     def plate_list(form):
         """Every Number Plate typed, one per field; a comma, semicolon or "ir" also separates them."""
@@ -337,7 +348,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
                 return render_template("register.html", email=email, form=form)
             try:
                 colleague = garage.colleague_by_email(email) or garage.register(
-                    email, form["name"], plate_list(request.form), phone=form["phone"])
+                    email, form["name"], plate_list(request.form), phone=phone_from(request.form))
             except Refused as error:
                 refused(error)
                 return render_template("register.html", email=email, form=form)
@@ -352,7 +363,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         """The one extra step for a Colleague who registered before Phone Numbers."""
         if request.method == "POST":
             try:
-                garage.set_phone(g.me, request.form.get("phone", ""))
+                garage.set_phone(g.me, phone_from(request.form))
             except Refused as error:
                 refused(error)
                 return render_template("phone.html", phone=request.form.get("phone", ""))
@@ -379,6 +390,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         option = next((d for d in days if d.day == day), None)
         mine = garage.my_bookings(g.me)
         plate = request.args.get("numeris", "").strip()
+        plate_owner = garage.whose_plate(plate) if plate else None
         starts, ends = time_options(day)
         return render_template(
             "day.html", day=day, days=days, option=option, view=garage.day_view(day, g.me),
@@ -387,7 +399,8 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
             offer=request.args.get("laukti") == "1", offer_kind=request.args.get("kind", "whole"),
             offer_start=request.args.get("start", ""), offer_end=request.args.get("end", ""),
             starts=starts, ends=ends, rules=garage.rules(), plate=plate,
-            plate_owner=garage.whose_plate(plate) if plate else None)
+            plate_owner=plate_owner,
+            plate_guest=garage.guest_by_plate(plate, day) if plate and plate_owner is None else None)
 
     @app.post("/rezervuoti")
     @signed_in
@@ -473,7 +486,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
     def profile():
         if request.method == "POST":
             try:
-                garage.set_phone(g.me, request.form.get("phone", ""))
+                garage.set_phone(g.me, phone_from(request.form))
             except Refused as error:
                 refused(error)
                 return render_template("profile.html", phone=request.form.get("phone", ""),
@@ -481,7 +494,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
             garage.set_plates(g.me, plate_list(request.form))
             flash("Išsaugota.")
             return redirect(url_for("profile"))
-        return render_template("profile.html", phone=lt.phone(g.me.phone), plates=garage.plates(g.me))
+        return render_template("profile.html", phone=lt.phone_local(g.me.phone), plates=garage.plates(g.me))
 
     # ---- administration --------------------------------------------------------------------
 
@@ -501,11 +514,39 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
     @admin_only
     def admin_cancel(booking_id):
         try:
-            garage.cancel(g.me, booking_id)
-            flash("Rezervacija atšaukta, kolegai pranešta.")
+            told = garage.cancel(g.me, booking_id)
+            flash("Rezervacija atšaukta, kolegai pranešta." if told else "Rezervacija atšaukta.")
         except Refused as error:
             refused(error)
         return back(url_for("admin_home"))
+
+    @app.route("/admin/sveciai", methods=["GET", "POST"])
+    @admin_only
+    def admin_guests():
+        """Guest Bookings: any open day from today on, as many as needed, free Spaces only."""
+        form = {"guest": request.form.get("guest", "").strip(), "plate": request.form.get("plate", "").strip(),
+                "day": request.form.get("day") or request.args.get("diena") or now().date().isoformat(),
+                "kind": request.form.get("kind", "whole"), "start": request.form.get("start", ""),
+                "end": request.form.get("end", "")}
+        if request.method == "POST":
+            start, end = period_from(request.form)
+            try:
+                day = date.fromisoformat(form["day"])
+            except ValueError:
+                flash("Pasirinkite dieną.", "error")
+            else:
+                try:
+                    booking = garage.book_guest(g.me, day, form["guest"], plate=form["plate"],
+                                                start=start, end=end)
+                except Refused as error:
+                    refused(error)
+                else:
+                    flash("Svečiui rezervuota vieta Nr. %s: %s, %s–%s." % (
+                        booking.space, lt.day_label(booking.day), booking.start, booking.end))
+                    return redirect(url_for("admin_guests"))
+        starts, ends = time_options()
+        return render_template("admin/guests.html", form=form, guests=garage.guest_bookings(),
+                               starts=starts, ends=ends)
 
     @app.route("/admin/vietos", methods=["GET", "POST"])
     @admin_only

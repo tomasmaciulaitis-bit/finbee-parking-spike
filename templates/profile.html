@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% set tab = 'profile' %}
 {% set hide_push_nudge = True %}
-{% from "_macros.html" import plate_fields %}
+{% from "_macros.html" import plate_fields, phone_field %}
 {% block title %}Profilis{% endblock %}
 {% block content %}
 <p class="eyebrow">Profilis</p>
@@ -17,9 +17,7 @@
 
 <form class="card" method="post" action="{{ url_for('profile') }}">
   <h2>Telefonas ir automobilis</h2>
-  <label class="field"><span>Telefono numeris</span>
-    <input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+370 612 34567" value="{{ phone }}" required>
-  </label>
+  {{ phone_field(phone) }}
   {{ plate_fields(plates) }}
   <p class="small muted">Kolegos, ieškantys, kieno automobilis stovi vietoje, pagal numerį matys jūsų vardą ir galės jums paskambinti.</p>
   <button class="btn btn-block">Išsaugoti</button>

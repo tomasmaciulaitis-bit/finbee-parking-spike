@@ -75,18 +75,19 @@ _LT_: valstybinis numeris
 _Avoid_: licence plate, car registration (collides with Registration), vehicle
 
 **Phone Number**:
-The number a Colleague can be called on, required at Registration and changeable later.
+The Lithuanian (+370) number a Colleague can be called on, required at Registration and
+changeable later; the field fixes +370, so only the rest is typed.
 Whoever looks up one of their Number Plates sees it next to their name, to call them, say,
 to move the car. A Colleague who registered before Phone Numbers existed gives theirs
 before anything else on their next visit.
 _LT_: telefono numeris
 _Avoid_: contact, mobile, phone (alone)
 
-**Visitor**:
-Someone from outside finbee coming to the office by car. Visitors never hold Bookings;
-their parking is arranged outside the app.
-_LT_: lankytojas
-_Avoid_: guest, guest booking
+**Guest**:
+Someone from outside finbee coming to the office by car. A Guest never uses the app: an
+Admin books a Space for them (a Guest Booking).
+_LT_: svečias
+_Avoid_: visitor, lankytojas
 
 ### Bookings
 
@@ -112,11 +113,22 @@ end times in 30-minute steps.
 _LT_: rezervacija valandoms
 _Avoid_: slot, time slot, hourly booking
 
+**Guest Booking**:
+A Booking an Admin makes for a Guest, with the Guest's name (or company) and, if known,
+their Number Plate. The Admin who made it holds it and is told of any change to it. Admins
+make as many as they need, on any open day from today on: the Booking Limit, the one-a-day
+rule and the Booking Window don't apply, and there is no Reminder. It takes only a free
+Space, so nobody is bumped, and a Guest never waits on the Waitlist. Every Colleague sees
+it in the Day View, and looking up its Number Plate that day shows the Guest and who booked.
+_LT_: svečio rezervacija
+_Avoid_: visitor booking, guest reservation
+
 **Cancellation**:
 A Colleague giving up a Booking, allowed at any time before it ends. Once the Booking has
-started, it means leaving: the Booking ends at the next half hour. Either way the freed
-time goes to Promotion at once and the Colleague's place under the Booking Limit comes
-back. There is no penalty for cancelling late. An Admin can cancel anyone's Booking, and that
+started, it means leaving: the Booking ends at once, cut back to the current half hour
+(the earliest a new Booking that day may start), and one begun this half hour goes
+entirely. Either way the freed time goes to Promotion at once and the Colleague's place
+under the Booking Limit comes back. There is no penalty for cancelling late. An Admin can cancel anyone's Booking, and that
 Colleague is told.
 _LT_: atšaukimas (never atlaisvinimas, which is Release)
 _Avoid_: release (collides with Release), delete, drop
@@ -179,7 +191,7 @@ _Avoid_: opening hours (collides with Opening Time), garage hours
 
 **Booking Limit**:
 The most upcoming Bookings and Waitlist Entries a Colleague can hold at once, set by an
-Admin. Whole-Day and Part-Day Bookings count the same.
+Admin. Whole-Day and Part-Day Bookings count the same; Guest Bookings don't count.
 _LT_: rezervacijų limitas
 _Avoid_: quota, cap, allowance
 

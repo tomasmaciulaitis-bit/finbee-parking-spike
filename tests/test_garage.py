@@ -2,7 +2,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -167,14 +167,27 @@ class CancellationTest(GarageTest):
         self.garage.cancel(ona, booking.id)
         self.assertEqual(self.garage.book(jonas, TUESDAY).space, "12")
 
-    def test_cancelling_after_the_start_means_leaving_at_the_next_half_hour(self):
+    def test_leaving_ends_the_booking_at_once_and_frees_the_space_from_the_current_half_hour(self):
         self.spaces("12")
-        ona = self.colleague("Ona")
+        ona, jonas = self.colleague("Ona"), self.colleague("Jonas")
         booking = self.garage.book(ona, TUESDAY)
         self.clock.set(TUESDAY, "10:10")
         self.garage.cancel(ona, booking.id)
-        [kept] = self.garage.my_bookings(ona).upcoming
-        self.assertEqual((kept.start, kept.end), ("07:00", "10:30"))
+        mine = self.garage.my_bookings(ona)
+        after = self.garage.book(jonas, TUESDAY)
+        self.assertEqual((mine.upcoming, [(b.start, b.end) for b in mine.past], (after.space, after.start)),
+                         ([], [("07:00", "10:00")], ("12", "10:00")))
+
+    def test_leaving_a_booking_begun_this_half_hour_removes_it_so_the_day_can_be_booked_again(self):
+        self.spaces("12")
+        ona = self.colleague("Ona")
+        self.clock.set(TUESDAY, "10:05")
+        booking = self.garage.book(ona, TUESDAY)
+        self.clock.set(TUESDAY, "10:20")
+        self.garage.cancel(ona, booking.id)
+        mine = self.garage.my_bookings(ona)
+        self.assertEqual((booking.start, mine.upcoming, mine.past, self.garage.book(ona, TUESDAY).start),
+                         ("10:00", [], [], "10:00"))
 
 
 class WaitlistTest(GarageTest):
@@ -641,6 +654,111 @@ class PhoneNumberTest(GarageTest):
             ona = garage.colleague_by_email("ona@finbeeverslui.lt")
             garage.set_phone(ona, "861234567")
             self.assertEqual((ona.phone, garage.colleague(ona.id).phone), (None, "+37061234567"))
+
+
+WEDNESDAY = date(2026, 10, 7)
+FOUR_WEEKS_ON = date(2026, 11, 2)  # a Monday, far past the Booking Window
+
+
+class GuestBookingTest(GarageTest):
+    def test_an_admin_books_free_spaces_for_guests_as_often_as_needed_and_still_books_their_own(self):
+        self.spaces("1", "2", "3", "4")
+        guests = [self.garage.book_guest(self.admin, TUESDAY, "Svečias %d" % n) for n in range(3)]
+        own = [self.garage.book(self.admin, TUESDAY), self.garage.book(self.admin, WEDNESDAY)]
+        self.assertEqual((len({g.space for g in guests + own[:1]}), len(self.garage.my_bookings(self.admin).upcoming)),
+                         (4, 2))
+
+    def test_a_guest_can_be_booked_beyond_the_booking_window(self):
+        self.spaces("1")
+        booking = self.garage.book_guest(self.admin, FOUR_WEEKS_ON, "UAB Klientas")
+        with self.assertRaises(Refused) as refused:
+            self.garage.book(self.colleague("Ona"), FOUR_WEEKS_ON + timedelta(days=1))
+        self.assertEqual((booking.space, refused.exception.code), ("1", "outside_window"))
+
+    def test_a_guest_gets_only_a_free_space_and_nobody_is_bumped(self):
+        self.spaces("1")
+        self.garage.book(self.colleague("Ona"), TUESDAY)
+        with self.assertRaises(Refused) as refused:
+            self.garage.book_guest(self.admin, TUESDAY, "UAB Klientas")
+        self.assertEqual(refused.exception.code, "no_space")
+
+    def test_only_an_admin_books_for_guests_and_a_guest_needs_a_name(self):
+        self.spaces("1")
+        codes = []
+        for who, guest in ((self.colleague("Ona"), "UAB Klientas"), (self.admin, "  ")):
+            try:
+                self.garage.book_guest(who, TUESDAY, guest)
+            except Refused as error:
+                codes.append(error.code)
+        self.assertEqual(codes, ["not_allowed", "no_guest"])
+
+    def test_everyone_sees_the_guest_in_the_day_view_and_it_is_not_the_admins_own_booking(self):
+        self.spaces("1")
+        self.garage.book_guest(self.admin, TUESDAY, "UAB Klientas", start="09:00", end="12:00")
+        seen = [self.garage.day_view(TUESDAY, viewer).spaces[0].bookings[0]
+                for viewer in (self.colleague("Ona"), self.admin)]
+        self.assertEqual([(h.name, h.guest, h.mine, h.start) for h in seen],
+                         [("UAB Klientas", True, False, "09:00")] * 2)
+
+    def test_a_cancelled_guest_booking_frees_the_space_for_the_waitlist(self):
+        self.spaces("1")
+        booking = self.garage.book_guest(self.admin, TUESDAY, "UAB Klientas")
+        ona = self.colleague("Ona")
+        self.garage.join_waitlist(ona, TUESDAY)
+        self.garage.cancel(self.admin, booking.id)
+        self.assertEqual([b.day for b in self.garage.my_bookings(ona).upcoming], [TUESDAY])
+
+    def test_a_guests_car_is_found_by_its_plate_on_the_day_of_the_visit(self):
+        self.spaces("1")
+        self.garage.book_guest(self.admin, TUESDAY, "UAB Klientas", plate="gst 001")
+        found = self.garage.guest_by_plate("GST-001", TUESDAY)
+        self.assertEqual((found.guest, found.host.name, self.garage.guest_by_plate("GST001", WEDNESDAY)),
+                         ("UAB Klientas", "Admin", None))
+
+    def test_a_guest_booking_that_loses_its_space_is_cancelled_and_the_admin_told(self):
+        self.spaces("1")
+        self.garage.book_guest(self.admin, TUESDAY, "UAB Klientas")
+        self.garage.block_space(self.admin, "1", TUESDAY)
+        [note] = self.garage.pending_notifications()
+        self.assertEqual((self.garage.day_view(TUESDAY, self.admin).waiting, note.colleague_id,
+                          "UAB Klientas" in note.body), (0, self.admin.id, True))
+
+    def test_closing_the_day_tells_the_admin_whose_guest_it_was(self):
+        self.spaces("1")
+        self.garage.book_guest(self.admin, TUESDAY, "UAB Klientas")
+        self.garage.close_day(self.admin, TUESDAY)
+        [note] = self.garage.pending_notifications()
+        self.assertEqual((note.colleague_id, "UAB Klientas" in note.body), (self.admin.id, True))
+
+    def test_the_evening_reminder_is_only_for_colleagues_own_bookings(self):
+        self.spaces("1", "2")
+        self.garage.book_guest(self.admin, TUESDAY, "UAB Klientas")
+        ona = self.colleague("Ona")
+        self.garage.book(ona, TUESDAY)
+        self.clock.set(MONDAY, "18:00")
+        self.garage.queue_reminders()
+        self.assertEqual([n.colleague_id for n in self.garage.pending_notifications()], [ona.id])
+
+    def test_the_upcoming_guest_bookings_are_listed_in_date_order(self):
+        self.spaces("1")
+        self.garage.book_guest(self.admin, FOUR_WEEKS_ON, "Antras")
+        self.garage.book_guest(self.admin, TUESDAY, "Pirmas", plate="GST 001")
+        self.assertEqual([(g.day, g.guest, g.plate, g.host.name) for g in self.garage.guest_bookings()],
+                         [(TUESDAY, "Pirmas", "GST001", "Admin"), (FOUR_WEEKS_ON, "Antras", None, "Admin")])
+
+    def test_a_garage_from_before_guest_bookings_takes_them(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = str(Path(folder) / "parking.sqlite3")
+            old = sqlite3.connect(path)
+            old.executescript(
+                "CREATE TABLE bookings (id INTEGER PRIMARY KEY, colleague_id INTEGER NOT NULL, "
+                "space_id INTEGER NOT NULL, day TEXT NOT NULL, start_min INTEGER NOT NULL, "
+                "end_min INTEGER NOT NULL);")
+            old.close()
+            garage = Garage(path, now=self.clock, first_admin_email="admin@finbeeverslui.lt")
+            admin = garage.register("admin@finbeeverslui.lt", "Admin", [])
+            garage.add_space(admin, "1")
+            self.assertEqual(garage.book_guest(admin, TUESDAY, "UAB Klientas").space, "1")
 
 
 class ClosedDayTest(GarageTest):

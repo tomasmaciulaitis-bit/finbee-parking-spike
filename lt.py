@@ -20,3 +20,8 @@ def phone(number):
     if number and number.startswith("+370") and len(number) == 12:
         return "%s %s %s" % (number[:4], number[4:7], number[7:])
     return number or ""
+
+
+def phone_local(number):
+    """What goes after the phone field's fixed +370: '+37061234567' → '612 34567'."""
+    return phone(number)[5:] if number and number.startswith("+370") and len(number) == 12 else ""
