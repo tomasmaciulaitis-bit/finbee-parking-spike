@@ -215,6 +215,18 @@ class AppTest(unittest.TestCase):
         page = self.signed_in("ona@finbeeverslui.lt", name="Ona").get("/diena/2026-10-06").get_data(as_text=True)
         self.assertNotIn('name="ev"', page)
 
+    def test_after_cancelling_everything_a_colleague_can_book_today_again(self):
+        self.clock.set(date(2026, 10, 5), "08:05")
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        client.post("/rezervuoti", data={"day": "2026-10-05", "kind": "whole"})
+        ona = self.garage.colleague_by_email("ona@finbeeverslui.lt")
+        [booking] = self.garage.my_bookings(ona).upcoming
+        self.clock.set(date(2026, 10, 5), "10:10")
+        client.post("/atsaukti/%d" % booking.id)
+        page = client.post("/rezervuoti", data={"day": "2026-10-05", "kind": "whole"},
+                           follow_redirects=True).get_data(as_text=True)
+        self.assertEqual(("Rezervuota" in page, "jau turite rezervaciją" in page), (True, False))
+
     def test_a_form_posted_from_another_site_is_refused(self):
         client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
         response = client.post("/rezervuoti", data={"day": "2026-10-06", "kind": "whole"},

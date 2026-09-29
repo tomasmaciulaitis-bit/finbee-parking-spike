@@ -190,6 +190,36 @@ class CancellationTest(GarageTest):
                          ("10:00", [], [], "10:00"))
 
 
+class SameDayAgainTest(GarageTest):
+    def test_after_leaving_early_the_same_day_can_be_booked_again(self):
+        self.spaces("12")
+        ona = self.colleague("Ona")
+        self.clock.set(TUESDAY, "08:05")
+        booking = self.garage.book(ona, TUESDAY)
+        self.clock.set(TUESDAY, "10:10")
+        self.garage.cancel(ona, booking.id)
+        again = self.garage.book(ona, TUESDAY, "14:00", "18:00")
+        self.assertEqual((again.start, again.end), ("14:00", "18:00"))
+
+    def test_a_lapsed_waitlist_entry_no_longer_counts_as_the_days_one(self):
+        self.spaces("12")
+        ona, jonas = self.colleague("Ona"), self.colleague("Jonas")
+        self.clock.set(TUESDAY, "08:00")
+        self.garage.book(jonas, TUESDAY, "08:00", "12:00")
+        self.garage.join_waitlist(ona, TUESDAY, "09:00", "11:00")
+        self.clock.set(TUESDAY, "12:10")
+        self.assertEqual(self.garage.book(ona, TUESDAY).start, "12:00")
+
+    def test_a_booking_still_running_still_counts_as_the_days_one(self):
+        self.spaces("12", "13")
+        ona = self.colleague("Ona")
+        self.clock.set(TUESDAY, "08:05")
+        self.garage.book(ona, TUESDAY, "08:00", "12:00")
+        with self.assertRaises(Refused) as refused:
+            self.garage.book(ona, TUESDAY, "13:00", "17:00")
+        self.assertEqual(refused.exception.code, "one_per_day")
+
+
 class WaitlistTest(GarageTest):
     def test_freed_time_goes_to_the_first_entry_whose_whole_period_fits(self):
         self.spaces("12")

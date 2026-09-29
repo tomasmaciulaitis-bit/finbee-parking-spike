@@ -781,13 +781,16 @@ class Garage:
                 (owned["id"], day.isoformat()))]
             if free_gaps((start_min, end_min), released):
                 raise Refused("owner_holds")
+        today, now_min = self._today()
+        # One a day means one held now: a Booking that has ended (say, left early) and an Entry
+        # that has lapsed no longer count, so the day can be booked again.
         if self._db.execute(
                 "SELECT 1 FROM bookings WHERE colleague_id = :who AND day = :day "
-                "AND guest_name IS NULL UNION ALL "
-                "SELECT 1 FROM waitlist WHERE colleague_id = :who AND day = :day",
-                {"who": who.id, "day": day.isoformat()}).fetchone():
+                "AND guest_name IS NULL AND (day > :today OR end_min > :now) UNION ALL "
+                "SELECT 1 FROM waitlist WHERE colleague_id = :who AND day = :day "
+                "AND (day > :today OR start_min > :now)",
+                {"who": who.id, "day": day.isoformat(), "today": today, "now": now_min}).fetchone():
             raise Refused("one_per_day")
-        today, now_min = self._today()
         held = self._db.execute(
             "SELECT (SELECT COUNT(*) FROM bookings WHERE colleague_id = :who AND guest_name IS NULL "
             "        AND (day > :today OR (day = :today AND end_min > :now))) + "

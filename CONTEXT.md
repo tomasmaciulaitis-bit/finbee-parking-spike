@@ -107,7 +107,8 @@ _Avoid_: visitor, lankytojas
 A Colleague's claim on a Space for a period within a single day: either a Whole-Day
 Booking or a Part-Day Booking. The Colleague chooses the day and period; the app chooses
 the Space, and that choice never changes afterwards unless an Admin Blocks the Space.
-Never spans midnight. A Colleague holds at most one Booking or Waitlist Entry for any day.
+Never spans midnight. A Colleague holds at most one Booking or Waitlist Entry for any day;
+one that has ended (say, left early) or lapsed no longer counts, so the day can be booked again.
 A Booking can't be changed: a different day or period means a Cancellation and a new
 Booking, and the freed time may be Promoted to someone else in between. On the day itself a
 Booking starts no earlier than the current half hour.
