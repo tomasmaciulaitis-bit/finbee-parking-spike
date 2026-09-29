@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import day_picker, period_fields, space_row, call_button with context %}
+{% from "_macros.html" import day_picker, period_fields, space_row, call_button, ev_mark with context %}
 {% set tab = 'day' %}
 {% block title %}{{ lt.sentence(lt.day_label(day)) }}{% endblock %}
 {% block content %}
@@ -13,7 +13,7 @@
       <div>
         <div class="small muted">Jūsų rezervacija</div>
         <h2 style="margin: 2px 0">Vieta Nr. {{ my_booking.space }}</h2>
-        <div>{{ my_booking.start }}–{{ my_booking.end }}</div>
+        <div>{{ my_booking.start }}–{{ my_booking.end }}{% if my_booking.ev %} · {{ ev_mark() }}{% endif %}</div>
       </div>
       <form method="post" action="{{ url_for('cancel', booking_id=my_booking.id) }}"
             onsubmit="return confirm('Atšaukti rezervaciją?')">
@@ -45,6 +45,7 @@
       <input type="hidden" name="kind" value="{{ offer_kind }}">
       <input type="hidden" name="start" value="{{ offer_start }}">
       <input type="hidden" name="end" value="{{ offer_end }}">
+      <input type="hidden" name="ev" value="{{ '1' if offer_ev else '' }}">
       <button class="btn btn-primary btn-block">Užsirašyti į eilę{% if offer_kind == 'part' %} ({{ offer_start }}–{{ offer_end }}){% endif %}</button>
     </form>
     {% if view.waiting %}<p class="small muted">Jau laukia: {{ view.waiting }}.</p>{% endif %}
@@ -54,6 +55,9 @@
     <h2>Rezervuoti vietą</h2>
     <input type="hidden" name="day" value="{{ day.isoformat() }}">
     {{ period_fields(starts, ends) }}
+    {% if view.spaces | selectattr('ev') | rejectattr('blocked') | list %}
+    <label class="check"><input type="checkbox" name="ev" value="1" data-remember="ev"><span>Pageidauju vietos su įkrovimu</span></label>
+    {% endif %}
     <button class="btn btn-primary btn-block">Rezervuoti</button>
     <p class="small muted">Vietą parinksime automatiškai. Galite turėti iki {{ rules.booking_limit }} būsimų rezervacijų.</p>
   </form>
@@ -65,7 +69,7 @@
     <ul class="free-list">
       {% for free in view.availability %}
         <li><span>{{ free.start }}–{{ free.end }}</span>
-            <span class="muted">{{ free.spaces }} {{ 'vieta' if free.spaces == 1 else 'vietos' }}</span></li>
+            <span class="muted">{{ free.spaces }} {{ 'vieta' if free.spaces == 1 else 'vietos' }}{% if free.ev %} · {{ free.ev }} su įkrovimu{% endif %}</span></li>
       {% endfor %}
     </ul>
   {% else %}

@@ -437,6 +437,7 @@ class AdminTest(GarageTest):
                    "close_day": lambda: self.garage.close_day(ona, TUESDAY),
                    "block_space": lambda: self.garage.block_space(ona, "7", TUESDAY),
                    "rename_space": lambda: self.garage.rename_space(ona, "7", "70"),
+                   "set_ev": lambda: self.garage.set_ev(ona, "7", True),
                    "delete_space": lambda: self.garage.delete_space(ona, "7"),
                    "set_rules": lambda: self.garage.set_rules(ona, 7, "09:00", "07:00", "20:00", 5)}
         for name, action in actions.items():
@@ -806,6 +807,74 @@ class GuestBookingTest(GarageTest):
             admin = garage.register("admin@finbeeverslui.lt", "Admin", [])
             garage.add_space(admin, "1")
             self.assertEqual(garage.book_guest(admin, TUESDAY, "UAB Klientas").space, "1")
+
+
+class ChargingSpaceTest(GarageTest):
+    def test_an_admin_marks_a_charging_space_and_everyone_sees_which_it_is(self):
+        self.spaces("1", "2")
+        self.garage.set_ev(self.admin, "2", True)
+        self.garage.set_ev(self.admin, "1", False)
+        seen = {s.number: s.ev for s in self.garage.day_view(TUESDAY, self.colleague("Ona")).spaces}
+        listed = {s.number: s.ev for s in self.garage.spaces()}
+        self.assertEqual((seen, listed), ({"1": False, "2": True}, {"1": False, "2": True}))
+
+    def test_asking_for_charging_gets_a_free_charging_space(self):
+        self.spaces("1", "2", "3")
+        self.garage.set_ev(self.admin, "3", True)
+        booking = self.garage.book(self.colleague("Ona"), TUESDAY, ev=True)
+        self.assertEqual((booking.space, booking.ev), ("3", True))
+
+    def test_charging_comes_before_the_best_fit(self):
+        self.spaces("1", "2")
+        self.garage.set_ev(self.admin, "1", True)
+        self.garage.book(self.colleague("Ona"), TUESDAY, "07:00", "12:00")  # keeps off the charger
+        booking = self.garage.book(self.colleague("Jonas"), TUESDAY, "13:00", "17:00", ev=True)
+        self.assertEqual(booking.space, "1")
+
+    def test_others_get_a_charging_space_only_when_nothing_else_fits(self):
+        self.spaces("1", "2")
+        self.garage.set_ev(self.admin, "1", True)
+        first = self.garage.book(self.colleague("Ona"), TUESDAY)
+        second = self.garage.book(self.colleague("Jonas"), TUESDAY)
+        self.assertEqual((first.space, first.ev, second.space, second.ev), ("2", False, "1", True))
+
+    def test_charging_is_a_preference_so_a_plain_space_still_comes(self):
+        self.spaces("1", "2")
+        self.garage.set_ev(self.admin, "1", True)
+        self.garage.book(self.colleague("Ona"), TUESDAY, ev=True)
+        booking = self.garage.book(self.colleague("Jonas"), TUESDAY, ev=True)
+        self.assertEqual((booking.space, booking.ev), ("2", False))
+
+    def test_a_booking_moved_off_a_blocked_space_keeps_asking_for_charging(self):
+        self.spaces("1", "2", "3")
+        for number in ("1", "2"):
+            self.garage.set_ev(self.admin, number, True)
+        ona = self.colleague("Ona")
+        self.assertEqual(self.garage.book(ona, TUESDAY, ev=True).space, "1")
+        self.garage.block_space(self.admin, "1", TUESDAY)
+        self.assertEqual([b.space for b in self.garage.my_bookings(ona).upcoming], ["2"])
+
+    def test_the_day_shows_how_many_free_spaces_have_charging(self):
+        self.spaces("1", "2", "3")
+        self.garage.set_ev(self.admin, "3", True)
+        [free] = self.garage.day_view(TUESDAY, self.admin).availability
+        self.assertEqual((free.spaces, free.ev), (3, 1))
+
+    def test_a_garage_from_before_charging_spaces_takes_them(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = str(Path(folder) / "parking.sqlite3")
+            old = sqlite3.connect(path)
+            old.executescript(
+                "CREATE TABLE spaces (id INTEGER PRIMARY KEY, number TEXT UNIQUE NOT NULL, owner_id INTEGER);"
+                "CREATE TABLE waitlist (id INTEGER PRIMARY KEY, colleague_id INTEGER NOT NULL, day TEXT NOT NULL, "
+                "start_min INTEGER NOT NULL, end_min INTEGER NOT NULL, joined_at TEXT NOT NULL, "
+                "front INTEGER NOT NULL DEFAULT 0);"
+                "INSERT INTO spaces (number) VALUES ('1');")
+            old.close()
+            garage = Garage(path, now=self.clock, first_admin_email="admin@finbeeverslui.lt")
+            admin = garage.register("admin@finbeeverslui.lt", "Admin", [])
+            garage.set_ev(admin, "1", True)
+            self.assertEqual(garage.book(admin, TUESDAY, ev=True).ev, True)
 
 
 class ClosedDayTest(GarageTest):

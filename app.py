@@ -414,6 +414,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
             my_entry=next((w for w in mine.waiting if w.day == day), None),
             offer=request.args.get("laukti") == "1", offer_kind=request.args.get("kind", "whole"),
             offer_start=request.args.get("start", ""), offer_end=request.args.get("end", ""),
+            offer_ev=request.args.get("ev") == "1",
             starts=starts, ends=ends, rules=garage.rules(), plate=plate,
             plate_owner=plate_owner,
             plate_guest=garage.guest_by_plate(plate, day) if plate and plate_owner is None else None)
@@ -423,14 +424,17 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
     def book():
         day = parse_day(request.form.get("day"))
         start, end = period_from(request.form)
+        ev = request.form.get("ev") == "1"
         try:
-            booking = garage.book(g.me, day, start, end)
-            flash("Rezervuota: vieta Nr. %s, %s–%s." % (booking.space, booking.start, booking.end))
+            booking = garage.book(g.me, day, start, end, ev=ev)
+            flash("Rezervuota: vieta Nr. %s%s, %s–%s.%s" % (
+                booking.space, " su įkrovimu" if booking.ev else "", booking.start, booking.end,
+                " Laisvos vietos su įkrovimu nebuvo." if ev and not booking.ev else ""))
         except Refused as error:
             if error.code == "no_space":
                 return redirect(url_for("day_page", iso=day.isoformat(), laukti=1,
                                         kind=request.form.get("kind", "whole"),
-                                        start=start or "", end=end or ""))
+                                        start=start or "", end=end or "", ev="1" if ev else ""))
             refused(error)
         return redirect(url_for("day_page", iso=day.isoformat()))
 
@@ -440,7 +444,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         day = parse_day(request.form.get("day"))
         start, end = period_from(request.form)
         try:
-            garage.join_waitlist(g.me, day, start, end)
+            garage.join_waitlist(g.me, day, start, end, ev=request.form.get("ev") == "1")
             flash("Užsirašėte į laukiančiųjų sąrašą. Kai vieta atsiras, ją gausite automatiškai "
                   "ir jums pranešime.")
         except Refused as error:
@@ -543,7 +547,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         form = {"guest": request.form.get("guest", "").strip(), "plate": request.form.get("plate", "").strip(),
                 "day": request.form.get("day") or request.args.get("diena") or now().date().isoformat(),
                 "kind": request.form.get("kind", "whole"), "start": request.form.get("start", ""),
-                "end": request.form.get("end", "")}
+                "end": request.form.get("end", ""), "ev": request.form.get("ev") == "1"}
         if request.method == "POST":
             start, end = period_from(request.form)
             try:
@@ -553,12 +557,13 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
             else:
                 try:
                     booking = garage.book_guest(g.me, day, form["guest"], plate=form["plate"],
-                                                start=start, end=end)
+                                                start=start, end=end, ev=form["ev"])
                 except Refused as error:
                     refused(error)
                 else:
-                    flash("Svečiui rezervuota vieta Nr. %s: %s, %s–%s." % (
-                        booking.space, lt.day_label(booking.day), booking.start, booking.end))
+                    flash("Svečiui rezervuota vieta Nr. %s%s: %s, %s–%s." % (
+                        booking.space, " su įkrovimu" if booking.ev else "", lt.day_label(booking.day),
+                        booking.start, booking.end))
                     return redirect(url_for("admin_guests"))
         starts, ends = time_options()
         return render_template("admin/guests.html", form=form, guests=garage.guest_bookings(),
@@ -599,6 +604,17 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
             if new_number != number:
                 flash("Vieta Nr. %s dabar – Nr. %s.%s" % (
                     number, new_number, " Ją rezervavusiems kolegoms pranešta." if told else ""))
+        except Refused as error:
+            refused(error)
+        return redirect(url_for("admin_spaces"))
+
+    @app.post("/admin/vietos/<number>/ikrovimas")
+    @admin_only
+    def admin_set_ev(number):
+        ev = request.form.get("ev") == "1"
+        try:
+            garage.set_ev(g.me, number, ev)
+            flash("Vieta Nr. %s: %s." % (number, "su įkrovimu" if ev else "be įkrovimo"))
         except Refused as error:
             refused(error)
         return redirect(url_for("admin_spaces"))

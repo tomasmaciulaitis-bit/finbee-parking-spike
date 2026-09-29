@@ -21,8 +21,8 @@ _LT_: vieta
 _Avoid_: spot, slot, bay, place
 
 **Shared Space**:
-A Space that is not an Owned Space. Shared Spaces are interchangeable, which is why a
-Colleague books "a Space" rather than a particular one.
+A Space that is not an Owned Space. Shared Spaces are interchangeable apart from charging,
+which is why a Colleague books "a Space" rather than a particular one.
 _LT_: bendra vieta
 _Avoid_: pool space, free space, general space
 
@@ -34,6 +34,15 @@ priskirta vieta, which is what the app does to every Booking)
 _Avoid_: reserved space, dedicated space, fixed space
 
 ### People
+
+**Charging Space**:
+A Space with a charger for an electric car, marked so by an Admin. When booking, a Colleague
+can ask for one. It's a preference, not a condition: they get a free Charging Space if one
+fits, else another Space. Whoever doesn't ask gets a Charging Space only when nothing else
+fits, which keeps the chargers for those who need them. The ask stays with the Booking or
+Waitlist Entry, so a Booking moved off a Blocked Space looks for a charger again.
+_LT_: vieta su įkrovimu
+_Avoid_: EV spot, charger, electric space
 
 **Colleague**:
 A finbee employee using the app. Any of the 50+ employees could be one; only some drive.

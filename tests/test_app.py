@@ -201,6 +201,20 @@ class AppTest(unittest.TestCase):
         checked = client.get("/static/app.css").headers.get("Cache-Control", "")
         self.assertEqual(("max-age=31536000" in kept, checked), (True, "no-cache"))
 
+    def test_an_admin_marks_a_charging_space_and_a_colleague_asks_for_it(self):
+        self.garage.add_space(self.admin, "7")
+        self.signed_in("admin@finbeeverslui.lt").post("/admin/vietos/7/ikrovimas", data={"ev": "1"})
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        page = client.get("/diena/2026-10-06").get_data(as_text=True)
+        done = client.post("/rezervuoti", data={"day": "2026-10-06", "kind": "whole", "ev": "1"},
+                           follow_redirects=True).get_data(as_text=True)
+        [booking] = self.garage.my_bookings(self.garage.colleague_by_email("ona@finbeeverslui.lt")).upcoming
+        self.assertEqual(('name="ev"' in page, booking.space, "su įkrovimu" in done), (True, "7", True))
+
+    def test_the_charging_choice_shows_only_when_a_charging_space_exists(self):
+        page = self.signed_in("ona@finbeeverslui.lt", name="Ona").get("/diena/2026-10-06").get_data(as_text=True)
+        self.assertNotIn('name="ev"', page)
+
     def test_a_form_posted_from_another_site_is_refused(self):
         client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
         response = client.post("/rezervuoti", data={"day": "2026-10-06", "kind": "whole"},

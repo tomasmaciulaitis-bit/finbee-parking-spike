@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import period_fields with context %}
+{% from "_macros.html" import period_fields, ev_mark with context %}
 {% set tab = 'mine' %}
 {% block title %}Mano rezervacijos{% endblock %}
 {% block content %}
@@ -12,7 +12,7 @@
         {% set started = booking.day == today and booking.start <= now_hhmm %}
         <li class="spread">
           <div>
-            <b>Vieta Nr. {{ booking.space }}</b>
+            <b>Vieta Nr. {{ booking.space }}</b>{% if booking.ev %} {{ ev_mark() }}{% endif %}
             <div class="small">{{ lt.sentence(lt.day_label(booking.day)) }}, {{ booking.start }}–{{ booking.end }}</div>
           </div>
           <form method="post" action="{{ url_for('cancel', booking_id=booking.id) }}"

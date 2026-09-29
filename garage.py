@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS plates (
 CREATE TABLE IF NOT EXISTS spaces (
     id INTEGER PRIMARY KEY,
     number TEXT UNIQUE NOT NULL,
-    owner_id INTEGER REFERENCES colleagues(id)
+    owner_id INTEGER REFERENCES colleagues(id),
+    ev INTEGER NOT NULL DEFAULT 0  -- a Charging Space
 );
 CREATE TABLE IF NOT EXISTS closed_days (
     day TEXT PRIMARY KEY
@@ -54,7 +55,8 @@ CREATE TABLE IF NOT EXISTS bookings (
     start_min INTEGER NOT NULL,
     end_min INTEGER NOT NULL,
     guest_name TEXT,  -- set on a Guest Booking, whose colleague_id is the Admin who made it
-    guest_plate TEXT
+    guest_plate TEXT,
+    wants_ev INTEGER NOT NULL DEFAULT 0  -- asked for a Charging Space, kept for any later move
 );
 CREATE TABLE IF NOT EXISTS waitlist (
     id INTEGER PRIMARY KEY,
@@ -63,7 +65,8 @@ CREATE TABLE IF NOT EXISTS waitlist (
     start_min INTEGER NOT NULL,
     end_min INTEGER NOT NULL,
     joined_at TEXT NOT NULL,
-    front INTEGER NOT NULL DEFAULT 0
+    front INTEGER NOT NULL DEFAULT 0,
+    wants_ev INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS rules (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -124,7 +127,10 @@ def free_gaps(window, taken):
 
 
 # Columns added after the first version; a garage created before them gets them on opening.
-ADDED_COLUMNS = (("colleagues", "phone"), ("bookings", "guest_name"), ("bookings", "guest_plate"))
+ADDED_COLUMNS = (("colleagues", "phone", "TEXT"), ("bookings", "guest_name", "TEXT"),
+                 ("bookings", "guest_plate", "TEXT"), ("spaces", "ev", "INTEGER NOT NULL DEFAULT 0"),
+                 ("bookings", "wants_ev", "INTEGER NOT NULL DEFAULT 0"),
+                 ("waitlist", "wants_ev", "INTEGER NOT NULL DEFAULT 0"))
 
 
 def normal_plate(text):
@@ -158,18 +164,20 @@ def number_order(number):
     return (0, int(number), "") if number.isdigit() else (1, 0, number)
 
 
-def choose_space(candidates, start, end):
+def choose_space(candidates, start, end, wants_ev=False):
     """Best fit (ADR-0001): of the Spaces with a free gap around the period, take the one whose
     gap is smallest, so Part-Day Bookings pack together and whole Spaces stay free for
     Whole-Day Bookings. Between equal fits a Shared Space goes before a Released one, which
-    leaves the Owner free to Reclaim. `candidates` is [(space_id, number, gaps, owned)]."""
+    leaves the Owner free to Reclaim. Before all that comes charging (ADR-0006): whoever asks
+    for it gets a Charging Space first, and anyone else gets one only when nothing else fits.
+    `candidates` is [(space_id, number, gaps, owned, ev)]; the choice is (space_id, number, ev)."""
     best = None
-    for space_id, number, gaps, owned in candidates:
+    for space_id, number, gaps, owned, ev in candidates:
         for gap_start, gap_end in gaps:
             if gap_start <= start and end <= gap_end:
-                key = (gap_end - gap_start, owned, number_order(number))
+                key = (ev != bool(wants_ev), gap_end - gap_start, owned, number_order(number))
                 if best is None or key < best[0]:
-                    best = (key, (space_id, number))
+                    best = (key, (space_id, number, ev))
     return best[1] if best else None
 
 
@@ -190,6 +198,7 @@ class Booking:
     day: date
     start: str
     end: str
+    ev: bool = False  # the Space has a charger
 
 
 @dataclass(frozen=True)
@@ -267,6 +276,7 @@ class GuestBooking:
     guest: str      # the Guest's name, or their company's
     plate: object   # the Guest's Number Plate, if the Admin gave one
     host: object    # the Colleague (an Admin) who made it; told of any change to it
+    ev: bool = False
 
 
 @dataclass(frozen=True)
@@ -276,6 +286,7 @@ class SpaceDay:
     blocked: bool
     released: list       # [(start, end)] an Owned Space's Released periods
     bookings: list       # [HeldTime]
+    ev: bool = False     # a Charging Space
 
 
 @dataclass(frozen=True)
@@ -284,6 +295,7 @@ class Free:
     start: str
     end: str
     spaces: int
+    ev: int = 0  # how many of them are Charging Spaces
 
 
 @dataclass(frozen=True)
@@ -302,6 +314,7 @@ class SpaceInfo:
     owner: object   # the Owner's name, or None for a Shared Space
     blocks: list    # [Block] that haven't ended
     deletable: bool = False  # never booked and not Owned: added by mistake, so it can go
+    ev: bool = False         # a Charging Space
 
 
 @dataclass(frozen=True)
@@ -349,10 +362,10 @@ class Garage:
         self._db = sqlite3.connect(db_path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(SCHEMA)
-        for table, column in ADDED_COLUMNS:
+        for table, column, kind in ADDED_COLUMNS:
             if column not in {row["name"] for row in self._db.execute("PRAGMA table_info(%s)" % table)}:
                 with self._db:
-                    self._db.execute("ALTER TABLE %s ADD COLUMN %s TEXT" % (table, column))
+                    self._db.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, column, kind))
         with self._db:
             self._db.execute(
                 "INSERT OR IGNORE INTO rules (id, window_days, opening_min, hours_start_min, "
@@ -467,6 +480,14 @@ class Garage:
                              "Jūsų nuolatinė vieta dabar – Nr. %s (buvo Nr. %s). Vieta ta pati." % (
                                  new_number, number))
             return len(held) + (space["owner_id"] is not None)
+
+    def set_ev(self, actor, number, ev):
+        """Mark a Space as a Charging Space, or not. Bookings already on it stay where they are."""
+        with self._lock, self._db:
+            self._require_admin(actor)
+            if self._db.execute("UPDATE spaces SET ev = ? WHERE number = ?",
+                                (int(bool(ev)), number)).rowcount == 0:
+                raise Refused("not_found")
 
     def delete_space(self, actor, number):
         """Remove a Space added by mistake. Only one never booked and not Owned can go: a Space
@@ -597,7 +618,8 @@ class Garage:
              "last": last_day and last_day.isoformat(), "today": today, "now": now_min}).fetchall()
         for booking in affected:
             day = date.fromisoformat(booking["day"])
-            chosen = choose_space(self._candidates(day), booking["start_min"], booking["end_min"])
+            chosen = choose_space(self._candidates(day), booking["start_min"], booking["end_min"],
+                                  booking["wants_ev"])
             when = "%s, %s" % (lt.sentence(lt.day_label(day)), self._times(booking))
             if booking["guest_name"] is not None:
                 self._displace_guest(booking, number, chosen, when)
@@ -611,10 +633,10 @@ class Garage:
                 continue
             self._db.execute("DELETE FROM bookings WHERE id = ?", (booking["id"],))
             self._db.execute(
-                "INSERT INTO waitlist (colleague_id, day, start_min, end_min, joined_at, front) "
-                "VALUES (?, ?, ?, ?, ?, 1)", (booking["colleague_id"], booking["day"],
-                                              booking["start_min"], booking["end_min"],
-                                              self._now().isoformat()))
+                "INSERT INTO waitlist (colleague_id, day, start_min, end_min, joined_at, front, wants_ev) "
+                "VALUES (?, ?, ?, ?, ?, 1, ?)", (booking["colleague_id"], booking["day"],
+                                                 booking["start_min"], booking["end_min"],
+                                                 self._now().isoformat(), booking["wants_ev"]))
             self._notify(booking["colleague_id"], "Jūsų rezervacija atšaukta",
                          "%s: vieta Nr. %s nenaudojama, o laisvų vietų nėra. "
                          "Esate pirmas laukiančiųjų sąraše." % (when, number))
@@ -666,18 +688,19 @@ class Garage:
                                  "%s: garažas neveiks, %s." % (label, text))
                 self._db.execute("DELETE FROM %s WHERE day = ?" % table, (day.isoformat(),))
 
-    def book(self, who, day, start=None, end=None):
+    def book(self, who, day, start=None, end=None, ev=False):
+        """`ev` asks for a Charging Space: a preference, so a plain Space comes when none fits."""
         with self._lock, self._db:
             start_min, end_min = self._period(start, end, day)
             self._check_request(who, day, start_min, end_min)
-            chosen = choose_space(self._candidates(day), start_min, end_min)
+            chosen = choose_space(self._candidates(day), start_min, end_min, ev)
             if chosen is None:
                 raise Refused("no_space")
-            space_id, number = chosen
-            booking_id = self._insert_booking(who.id, space_id, day, start_min, end_min)
-            return Booking(booking_id, number, day, hhmm(start_min), hhmm(end_min))
+            space_id, number, charging = chosen
+            booking_id = self._insert_booking(who.id, space_id, day, start_min, end_min, ev)
+            return Booking(booking_id, number, day, hhmm(start_min), hhmm(end_min), charging)
 
-    def book_guest(self, actor, day, guest, plate=None, start=None, end=None):
+    def book_guest(self, actor, day, guest, plate=None, start=None, end=None, ev=False):
         """An Admin books a free Space for a Guest, as often as needed: the Booking Limit, the
         one-a-day rule and the Booking Window don't apply. Only a free Space will do, so
         nobody is bumped, and a Guest never waits on the Waitlist."""
@@ -691,23 +714,23 @@ class Garage:
             if self._is_closed(day):
                 raise Refused("closed_day")
             start_min, end_min = self._period(start, end, day)
-            chosen = choose_space(self._candidates(day), start_min, end_min)
+            chosen = choose_space(self._candidates(day), start_min, end_min, ev)
             if chosen is None:
                 raise Refused("no_space")
             plate = normal_plate(plate or "") or None
             booking_id = self._db.execute(
                 "INSERT INTO bookings (colleague_id, space_id, day, start_min, end_min, guest_name, "
-                "guest_plate) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (actor.id, chosen[0], day.isoformat(), start_min, end_min, guest, plate)).lastrowid
+                "guest_plate, wants_ev) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (actor.id, chosen[0], day.isoformat(), start_min, end_min, guest, plate, int(bool(ev)))).lastrowid
             return GuestBooking(booking_id, chosen[1], day, hhmm(start_min), hhmm(end_min), guest,
-                                plate, self._colleague("id", actor.id))
+                                plate, self._colleague("id", actor.id), chosen[2])
 
     def guest_bookings(self):
         """The Guest Bookings that haven't ended, soonest first."""
         with self._lock:
             today, now_min = self._today()
             return [self._guest_booking(row) for row in self._db.execute(
-                "SELECT b.*, s.number FROM bookings b JOIN spaces s ON s.id = b.space_id "
+                "SELECT b.*, s.number, s.ev FROM bookings b JOIN spaces s ON s.id = b.space_id "
                 "WHERE b.guest_name IS NOT NULL AND (b.day > :today OR (b.day = :today AND b.end_min > :now)) "
                 "ORDER BY b.day, b.start_min", {"today": today, "now": now_min}).fetchall()]
 
@@ -715,7 +738,7 @@ class Garage:
         """The Guest Booking on `day` for the car with this Number Plate, if any."""
         with self._lock:
             row = self._db.execute(
-                "SELECT b.*, s.number FROM bookings b JOIN spaces s ON s.id = b.space_id "
+                "SELECT b.*, s.number, s.ev FROM bookings b JOIN spaces s ON s.id = b.space_id "
                 "WHERE b.guest_plate = ? AND b.day = ? ORDER BY b.start_min",
                 (normal_plate(plate), day.isoformat())).fetchone()
             return self._guest_booking(row) if row else None
@@ -723,18 +746,18 @@ class Garage:
     def _guest_booking(self, row):
         return GuestBooking(row["id"], row["number"], date.fromisoformat(row["day"]),
                             hhmm(row["start_min"]), hhmm(row["end_min"]), row["guest_name"],
-                            row["guest_plate"], self._colleague("id", row["colleague_id"]))
+                            row["guest_plate"], self._colleague("id", row["colleague_id"]), bool(row["ev"]))
 
-    def join_waitlist(self, who, day, start=None, end=None):
+    def join_waitlist(self, who, day, start=None, end=None, ev=False):
         with self._lock, self._db:
             start_min, end_min = self._period(start, end, day)
             self._check_request(who, day, start_min, end_min)
             if choose_space(self._candidates(day), start_min, end_min) is not None:
                 raise Refused("space_free")
             cur = self._db.execute(
-                "INSERT INTO waitlist (colleague_id, day, start_min, end_min, joined_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (who.id, day.isoformat(), start_min, end_min, self._now().isoformat()))
+                "INSERT INTO waitlist (colleague_id, day, start_min, end_min, joined_at, wants_ev) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (who.id, day.isoformat(), start_min, end_min, self._now().isoformat(), int(bool(ev))))
             return WaitlistEntry(cur.lastrowid, day, hhmm(start_min), hhmm(end_min))
 
     def leave_waitlist(self, who, entry_id):
@@ -774,24 +797,26 @@ class Garage:
         if held >= self._rules()["booking_limit"]:
             raise Refused("limit")
 
-    def _insert_booking(self, colleague_id, space_id, day, start_min, end_min):
+    def _insert_booking(self, colleague_id, space_id, day, start_min, end_min, wants_ev=False):
         return self._db.execute(
-            "INSERT INTO bookings (colleague_id, space_id, day, start_min, end_min) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (colleague_id, space_id, day.isoformat(), start_min, end_min)).lastrowid
+            "INSERT INTO bookings (colleague_id, space_id, day, start_min, end_min, wants_ev) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (colleague_id, space_id, day.isoformat(), start_min, end_min, int(bool(wants_ev)))).lastrowid
 
     def _promote(self, day):
         """Hand freed time to the Waitlist: each Entry in order gets a Booking if its whole
         period fits, with no partial matches, so nobody races for the freed Space."""
         for entry in self._waitlist(day):
-            chosen = choose_space(self._candidates(day), entry["start_min"], entry["end_min"])
+            chosen = choose_space(self._candidates(day), entry["start_min"], entry["end_min"], entry["wants_ev"])
             if chosen is None:
                 continue
-            self._insert_booking(entry["colleague_id"], chosen[0], day, entry["start_min"], entry["end_min"])
+            self._insert_booking(entry["colleague_id"], chosen[0], day, entry["start_min"], entry["end_min"],
+                                 entry["wants_ev"])
             self._db.execute("DELETE FROM waitlist WHERE id = ?", (entry["id"],))
             self._notify(entry["colleague_id"], "Gavote vietą Nr. %s" % chosen[1],
-                         "%s, %s. Buvote laukiančiųjų sąraše." % (
-                             lt.sentence(lt.day_label(day)), self._times(entry)))
+                         "%s, %s. Buvote laukiančiųjų sąraše.%s" % (
+                             lt.sentence(lt.day_label(day)), self._times(entry),
+                             " Vieta su įkrovimu." if chosen[2] else ""))
 
     @staticmethod
     def _times(row):
@@ -838,9 +863,9 @@ class Garage:
                     row["last_day"] and date.fromisoformat(row["last_day"])))
             used = {row["space_id"] for row in self._db.execute("SELECT DISTINCT space_id FROM bookings")}
             spaces = [SpaceInfo(row["number"], row["owner"], blocks.get(row["id"], []),
-                                row["owner"] is None and row["id"] not in used)
+                                row["owner"] is None and row["id"] not in used, bool(row["ev"]))
                       for row in self._db.execute(
-                          "SELECT s.id, s.number, c.name AS owner FROM spaces s "
+                          "SELECT s.id, s.number, s.ev, c.name AS owner FROM spaces s "
                           "LEFT JOIN colleagues c ON c.id = s.owner_id")]
             return sorted(spaces, key=lambda s: number_order(s.number))
 
@@ -1086,7 +1111,7 @@ class Garage:
             today, now_min = self._today()
             upcoming, past = [], []
             for row in self._db.execute(
-                    "SELECT b.*, s.number FROM bookings b JOIN spaces s ON s.id = b.space_id "
+                    "SELECT b.*, s.number, s.ev FROM bookings b JOIN spaces s ON s.id = b.space_id "
                     "WHERE b.colleague_id = ? AND b.guest_name IS NULL ORDER BY b.day, b.start_min",
                     (who.id,)):
                 ended = row["day"] < today or (row["day"] == today and row["end_min"] <= now_min)
@@ -1116,9 +1141,9 @@ class Garage:
                 released.setdefault(row["space_id"], []).append(
                     (hhmm(row["start_min"]), hhmm(row["end_min"])))
             spaces = [SpaceDay(row["number"], row["owner"], self._is_blocked(row["id"], day),
-                               released.get(row["id"], []), held.get(row["id"], []))
+                               released.get(row["id"], []), held.get(row["id"], []), bool(row["ev"]))
                       for row in self._db.execute(
-                          "SELECT s.id, s.number, c.name AS owner FROM spaces s "
+                          "SELECT s.id, s.number, s.ev, c.name AS owner FROM spaces s "
                           "LEFT JOIN colleagues c ON c.id = s.owner_id")]
             queue = [row["colleague_id"] for row in self._waitlist(day)]
             return DayView(day, sorted(spaces, key=lambda s: number_order(s.number)),
@@ -1135,16 +1160,18 @@ class Garage:
 
     def _availability(self, day):
         counts = {}
-        for _, _, gaps, _ in self._candidates(day):
+        for _, _, gaps, _, ev in self._candidates(day):
             for gap in gaps:
                 if gap[1] - gap[0] >= 60:
-                    counts[gap] = counts.get(gap, 0) + 1
-        return [Free(hhmm(start), hhmm(end), n) for (start, end), n in sorted(counts.items())]
+                    spaces, charging = counts.get(gap, (0, 0))
+                    counts[gap] = (spaces + 1, charging + ev)
+        return [Free(hhmm(start), hhmm(end), n, charging)
+                for (start, end), (n, charging) in sorted(counts.items())]
 
     @staticmethod
     def _booking(row):
         return Booking(row["id"], row["number"], date.fromisoformat(row["day"]),
-                       hhmm(row["start_min"]), hhmm(row["end_min"]))
+                       hhmm(row["start_min"]), hhmm(row["end_min"]), bool(row["ev"]))
 
     def _candidates(self, day):
         """Every Space's free gaps on `day`: a Shared Space is open for the Bookable Hours, an
@@ -1158,12 +1185,12 @@ class Garage:
             released.setdefault(row["space_id"], []).append((row["start_min"], row["end_min"]))
         candidates = []
         for row in self._db.execute(
-                "SELECT id, number, owner_id FROM spaces WHERE id NOT IN (SELECT space_id FROM blocks "
+                "SELECT id, number, owner_id, ev FROM spaces WHERE id NOT IN (SELECT space_id FROM blocks "
                 "WHERE first_day <= :day AND (last_day IS NULL OR last_day >= :day))",
                 {"day": day.isoformat()}):
             windows = [self._hours()] if row["owner_id"] is None else released.get(row["id"], [])
             cut = self._earliest_start(day)
             windows = [(max(start, cut), end) for start, end in windows if end > cut]
             gaps = [gap for window in windows for gap in free_gaps(window, taken.get(row["id"], []))]
-            candidates.append((row["id"], row["number"], gaps, row["owner_id"] is not None))
+            candidates.append((row["id"], row["number"], gaps, row["owner_id"] is not None, bool(row["ev"])))
         return candidates

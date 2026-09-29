@@ -15,6 +15,15 @@
     sync();
   });
 
+  // A choice worth keeping, like asking for a Charging Space, stays ticked on this phone.
+  document.querySelectorAll('input[type=checkbox][data-remember]').forEach(function (box) {
+    var key = 'remember-' + box.dataset.remember;
+    try { box.checked = localStorage.getItem(key) === '1'; } catch (e) {}
+    box.addEventListener('change', function () {
+      try { localStorage.setItem(key, box.checked ? '1' : '0'); } catch (e) {}
+    });
+  });
+
   // Number Plates: one field each; "+ Pridėti dar vieną numerį" adds another.
   document.querySelectorAll('[data-plates]').forEach(function (set) {
     var add = set.querySelector('[data-add-plate]');

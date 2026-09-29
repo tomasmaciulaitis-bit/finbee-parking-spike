@@ -7,6 +7,9 @@
 </label>
 {% endmacro %}
 
+{# Marks a Charging Space. #}
+{% macro ev_mark() %}<span class="ev-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></svg>su įkrovimu</span>{% endmacro %}
+
 {# A number to call, as a button. #}
 {% macro call_button(number) %}
 <a class="btn btn-primary call" href="tel:{{ number }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 3.5h3l1.5 4-2 1.5a11 11 0 0 0 7 7l1.5-2 4 1.5v3a2 2 0 0 1-2 2A17 17 0 0 1 3.5 5.5a2 2 0 0 1 2-2z"/></svg>{{ lt.phone(number) }}</a>
@@ -59,7 +62,7 @@
   <div class="space-body">
     <div class="spread">
       <span class="small muted">
-        {% if space.blocked %}Užblokuota{% elif space.owner %}Nuolatinė · {{ space.owner }}{% else %}Bendra{% endif %}
+        {% if space.blocked %}Užblokuota{% elif space.owner %}Nuolatinė · {{ space.owner }}{% else %}Bendra{% endif %}{% if space.ev %} · {{ ev_mark() }}{% endif %}
       </span>
       {% if not space.blocked and not space.bookings and (not space.owner or space.released) %}
         <span class="badge ok">Laisva</span>

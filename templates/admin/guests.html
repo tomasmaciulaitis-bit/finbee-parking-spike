@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import period_fields with context %}
+{% from "_macros.html" import period_fields, ev_mark with context %}
 {% set tab = 'admin' %}
 {% set section = 'guests' %}
 {% block title %}Svečiai{% endblock %}
@@ -21,6 +21,7 @@
     <input name="day" type="date" min="{{ today.isoformat() }}" value="{{ form.day }}" required>
   </label>
   {{ period_fields(starts, ends, form.kind, form.start, form.end) }}
+  <label class="check"><input type="checkbox" name="ev" value="1" {{ 'checked' if form.ev }}><span>Svečiui reikia vietos su įkrovimu</span></label>
   <button class="btn btn-primary btn-block">Rezervuoti</button>
   <p class="small muted">Vietą parinksime iš laisvų. Jei laisvos vietos nėra, rezervuoti nepavyks: svečiai eilėje nelaukia.
     Kolegos svečią matys dienos užimtume, o pagal numerį ras, kas jam rezervavo vietą.</p>
@@ -34,7 +35,7 @@
     <li class="spread">
       <div>
         <b>{{ booking.guest }}</b>{% if booking.plate %} <span class="badge">{{ booking.plate }}</span>{% endif %}
-        <div class="small muted">{{ lt.sentence(lt.day_label(booking.day)) }}, {{ booking.start }}–{{ booking.end }} · vieta Nr. {{ booking.space }} · rezervavo {{ booking.host.name }}</div>
+        <div class="small muted">{{ lt.sentence(lt.day_label(booking.day)) }}, {{ booking.start }}–{{ booking.end }} · vieta Nr. {{ booking.space }}{% if booking.ev %} {{ ev_mark() }}{% endif %} · rezervavo {{ booking.host.name }}</div>
       </div>
       <form method="post" action="{{ url_for('admin_cancel', booking_id=booking.id) }}"
             onsubmit="return confirm('Atšaukti svečio rezervaciją?')">

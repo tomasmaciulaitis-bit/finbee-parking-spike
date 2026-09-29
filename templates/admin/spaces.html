@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% set tab = 'admin' %}
 {% set section = 'spaces' %}
+{% from "_macros.html" import ev_mark %}
 {% block title %}Vietos{% endblock %}
 {% block content %}
 {% include "admin/_nav.html" %}
@@ -12,6 +13,10 @@
     <h2 style="margin: 0">Nr. {{ space.number }}</h2>
     <span class="badge">{{ 'Nuolatinė' if space.owner else 'Bendra' }}</span>
   </div>
+  <form method="post" action="{{ url_for('admin_set_ev', number=space.number) }}" class="spread">
+    <label class="check"><input type="checkbox" name="ev" value="1" {{ 'checked' if space.ev }}><span>Su elektromobilio įkrovimu</span></label>
+    <button class="btn btn-small" style="flex: 0 0 auto">Išsaugoti</button>
+  </form>
   <form method="post" action="{{ url_for('admin_set_owner', number=space.number) }}" class="row" style="align-items: end">
     <label class="field"><span>Nuolatinės vietos turėtojas</span>
       <select name="owner_id">
