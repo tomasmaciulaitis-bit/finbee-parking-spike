@@ -16,7 +16,7 @@
             <div class="small">{{ lt.sentence(lt.day_label(booking.day)) }}, {{ booking.start }}–{{ booking.end }}</div>
           </div>
           <form method="post" action="{{ url_for('cancel', booking_id=booking.id) }}"
-                onsubmit="return confirm('{{ 'Išvažiuojate? Likęs laikas atiteks kitiems.' if started else 'Atšaukti rezervaciją?' }}')">
+                data-confirm="{{ 'Išvažiuojate? Likęs laikas atiteks kitiems.' if started else 'Atšaukti rezervaciją?' }}">
             <button class="btn btn-danger btn-small">{{ 'Išvažiuoju' if started else 'Atšaukti' }}</button>
           </form>
         </li>

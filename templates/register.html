@@ -8,7 +8,7 @@
 <p class="muted">{{ email }} – dar keli dalykai ir galėsite rezervuoti.</p>
 <form class="card" method="post" action="{{ url_for('register') }}">
   <label class="field"><span>Vardas ir pavardė</span>
-    <input name="name" autocomplete="name" value="{{ form.name }}" required autofocus>
+    <input name="name" autocomplete="name" maxlength="80" value="{{ form.name }}" required autofocus>
   </label>
   {{ phone_field(form.phone) }}
   {{ plate_fields(form.plates) }}

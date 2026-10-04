@@ -37,7 +37,7 @@
   <details>
     <summary class="small muted">Užblokuoti vietą</summary>
     <form method="post" action="{{ url_for('admin_block', number=space.number) }}"
-          onsubmit="return confirm('Rezervacijos bus perkeltos į kitas vietas arba atšauktos. Tęsti?')">
+          data-confirm="Rezervacijos bus perkeltos į kitas vietas arba atšauktos. Tęsti?">
       <div class="row">
         <label class="field"><span>Nuo</span><input type="date" name="first_day" min="{{ today.isoformat() }}" required></label>
         <label class="field"><span>Iki (tuščia – neribotai)</span><input type="date" name="last_day" min="{{ today.isoformat() }}"></label>
@@ -48,12 +48,12 @@
   <details>
     <summary class="small muted">Pervadinti arba ištrinti</summary>
     <form method="post" action="{{ url_for('admin_rename_space', number=space.number) }}" class="row" style="align-items: end">
-      <label class="field"><span>Naujas numeris</span><input name="new_number" value="{{ space.number }}" required></label>
+      <label class="field"><span>Naujas numeris</span><input name="new_number" maxlength="10" value="{{ space.number }}" required></label>
       <button class="btn btn-small" style="flex: 0 0 auto; margin-bottom: 12px">Pervadinti</button>
     </form>
     {% if space.deletable %}
     <form method="post" action="{{ url_for('admin_delete_space', number=space.number) }}"
-          onsubmit="return confirm('Ištrinti vietą Nr. {{ space.number }}?')">
+          data-confirm="Ištrinti vietą Nr. {{ space.number }}?">
       <button class="btn btn-danger btn-small">Ištrinti vietą</button>
     </form>
     {% elif space.owner %}
@@ -70,7 +70,7 @@
 <form class="card" method="post" action="{{ url_for('admin_spaces') }}">
   <h2>Pridėti vietą</h2>
   <div class="row">
-    <input name="number" placeholder="Numeris, pvz. 12" required>
+    <input name="number" maxlength="10" placeholder="Numeris, pvz. 12" required>
     <button class="btn btn-primary" style="flex: 0 0 auto">Pridėti</button>
   </div>
 </form>

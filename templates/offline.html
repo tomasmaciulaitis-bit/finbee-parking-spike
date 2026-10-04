@@ -1,0 +1,32 @@
+<!doctype html>
+{# Saved by the service worker when the app is installed, and shown with no connection for a
+   page the phone hasn't saved yet. Self-contained and about nobody: no styles or scripts to fetch. #}
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nėra ryšio · Parkavimas</title>
+<style>
+  body { margin: 0; min-height: 100vh; box-sizing: border-box; padding: 24px; display: flex; align-items: center;
+         justify-content: center; background: #f2f2f2; color: #1f1f1f;
+         font-family: "Muli", "Mulish", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .card { max-width: 420px; padding: 28px 24px; border-radius: 24px; background: #fff; text-align: center;
+          box-shadow: 0 2px 16px rgba(0, 0, 0, .04); }
+  svg { width: 40px; height: 40px; fill: none; stroke: #6c757d; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  h1 { margin: 12px 0 8px; font-size: 22px; }
+  p { margin: 0 0 20px; color: #6c757d; line-height: 1.5; }
+  button { min-height: 48px; padding: 12px 24px; border: 0; border-radius: 999px; background: #fec740; color: #1f1f1f;
+           font: inherit; font-weight: 700; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="card">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M12 19h.01M3 3l18 18"/></svg>
+  <h1>Nėra interneto ryšio</h1>
+  <p>Šio puslapio telefone dar neturime: išsaugome tik tuos, kuriuos atidarėte su ryšiu.
+    Kai ryšys atsiras, programėlė veiks įprastai.</p>
+  <button type="button" onclick="location.reload()">Bandyti dar kartą</button>
+</div>
+<script>window.addEventListener('online', function () { location.reload(); });</script>
+</body>
+</html>

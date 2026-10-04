@@ -6,7 +6,8 @@ busy day. An installable web app in Lithuanian: colleagues add it to their iPhon
 - The words: [CONTEXT.md](CONTEXT.md). Every page, notification and email uses them.
 - The decisions: [docs/adr/](docs/adr/). They cover the app assigning the Space (0001), a web app
   rather than native iOS (0002), no connection to the building's system (0003), Render (0004),
-  Admins booking Spaces for Guests (0005), and charging coming before best fit (0006).
+  Admins booking Spaces for Guests (0005), charging coming before best fit (0006), and the
+  installed app opening offline with pages as last loaded (0007).
 
 ## Code
 
@@ -17,6 +18,7 @@ busy day. An installable web app in Lithuanian: colleagues add it to their iPhon
 | `notify.py` | Sends queued notifications by push and email, plus the Gmail and Web Push adapters. |
 | `app.py` | The Flask pages, the Home Screen app files, and the background loop. |
 | `lt.py` | Lithuanian wording for dates and phone numbers. |
+| `static/sw.js` | Push notifications, and offline: pages as last loaded and an offline page. |
 
 ## Run it locally
 

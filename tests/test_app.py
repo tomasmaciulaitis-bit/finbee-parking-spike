@@ -244,6 +244,37 @@ class AppTest(unittest.TestCase):
         self.assertEqual((sorted(listed), "Vadovas" in page, "Vadovas A" in admin_day),
                          (["1", "12"], False, True))
 
+    def test_the_offline_page_is_there_for_the_installed_app_and_names_nobody(self):
+        self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        page = self.app.test_client().get("/offline")
+        text = page.get_data(as_text=True)
+        self.assertEqual((page.status_code, "Nėra interneto ryšio" in text, "Ona" in text), (200, True, False))
+
+    def test_pages_say_when_they_were_made_and_whether_someone_is_signed_in(self):
+        signed_out = self.app.test_client().get("/").get_data(as_text=True)
+        signed_in = self.signed_in("ona@finbeeverslui.lt", name="Ona").get("/diena/2026-10-06").get_data(as_text=True)
+        self.assertEqual(('data-rendered="2026-10-05T10:00"' in signed_in, 'data-signed-in="1"' in signed_in,
+                          'data-signed-in' in signed_out), (True, True, False))
+
+    def test_a_name_is_never_written_into_a_script(self):
+        self.garage.register("x@finbeeverslui.lt", "X'); alert(1); ('", [], phone="+370 600 00009")
+        page = self.signed_in("admin@finbeeverslui.lt").get("/admin/kolegos").get_data(as_text=True)
+        templates = "".join(p.read_text() for p in (Path(parking.__file__).parent / "templates").rglob("*.html"))
+        self.assertEqual(("onsubmit" in templates, "onsubmit" in page, "X&#39;); alert(1); (&#39;" in page),
+                         (False, False, True))
+
+    def test_going_back_never_leaves_the_app(self):
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        landed = [client.post("/atsaukti/999", data={"next": target}).location
+                  for target in ("/\\evil.example", "//evil.example", "/\t/evil.example", "https://evil.example",
+                                 "/diena/2026-10-06")]
+        self.assertEqual(landed, ["/mano"] * 4 + ["/diena/2026-10-06"])
+
+    def test_a_too_long_plate_in_the_profile_is_explained_not_an_error(self):
+        client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
+        response = client.post("/profilis", data={"phone": "612 34567", "plates": ["X" * 13]})
+        self.assertEqual((response.status_code, "per ilgas" in response.get_data(as_text=True)), (200, True))
+
     def test_a_form_posted_from_another_site_is_refused(self):
         client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
         response = client.post("/rezervuoti", data={"day": "2026-10-06", "kind": "whole"},

@@ -7,7 +7,7 @@
 <h1>Uždarytos dienos</h1>
 <p class="muted">Savaitgaliai uždaryti visada. Uždarius dieną, jos rezervacijos ir eilė atšaukiamos, kolegoms pranešama.</p>
 <form class="card" method="post" action="{{ url_for('admin_days') }}"
-      onsubmit="return confirm('Visos tos dienos rezervacijos bus atšauktos. Tęsti?')">
+      data-confirm="Visos tos dienos rezervacijos bus atšauktos. Tęsti?">
   <div class="row">
     <input type="date" name="day" min="{{ today.isoformat() }}" required>
     <button class="btn btn-danger" style="flex: 0 0 auto">Uždaryti</button>

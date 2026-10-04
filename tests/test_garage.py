@@ -907,6 +907,34 @@ class ChargingSpaceTest(GarageTest):
             self.assertEqual(garage.book(admin, TUESDAY, ev=True).ev, True)
 
 
+class LengthLimitTest(GarageTest):
+    def test_typed_text_has_sensible_limits(self):
+        self.spaces("1")
+        attempts = {
+            "space number": lambda: self.garage.add_space(self.admin, "12345678901"),
+            "new space number": lambda: self.garage.rename_space(self.admin, "1", "12345678901"),
+            "guest name": lambda: self.garage.book_guest(self.admin, TUESDAY, "x" * 81),
+            "guest plate": lambda: self.garage.book_guest(self.admin, TUESDAY, "UAB Klientas", plate="X" * 13),
+            "name": lambda: self.garage.register("long@finbeeverslui.lt", "x" * 81, []),
+            "plate": lambda: self.garage.register("plate@finbeeverslui.lt", "Ona", ["ABC1234567890"]),
+        }
+        codes = {}
+        for what, attempt in attempts.items():
+            try:
+                attempt()
+            except Refused as error:
+                codes[what] = error.code
+        self.assertEqual((codes, self.garage.colleague_by_email("plate@finbeeverslui.lt")),
+                         ({"space number": "bad_number", "new space number": "bad_number", "guest name": "no_guest",
+                           "guest plate": "bad_plate", "name": "bad_name", "plate": "bad_plate"}, None))
+
+    def test_a_too_long_plate_leaves_the_plates_as_they_were(self):
+        ona = self.garage.register("ona@finbeeverslui.lt", "Ona", ["ABC 123"])
+        with self.assertRaises(Refused):
+            self.garage.set_plates(ona, ["KLM 456", "X" * 13])
+        self.assertEqual(self.garage.plates(ona), ["ABC123"])
+
+
 class ClosedDayTest(GarageTest):
     def test_weekends_and_days_an_admin_closed_cannot_be_booked(self):
         self.spaces("12")

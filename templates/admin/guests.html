@@ -12,10 +12,10 @@
 <form class="card" method="post" action="{{ url_for('admin_guests') }}" data-period>
   <h2>Rezervuoti svečiui</h2>
   <label class="field"><span>Svečias</span>
-    <input name="guest" placeholder="Vardas ir pavardė arba įmonė" value="{{ form.guest }}" required>
+    <input name="guest" maxlength="80" placeholder="Vardas ir pavardė arba įmonė" value="{{ form.guest }}" required>
   </label>
   <label class="field"><span>Automobilio valstybinis numeris (nebūtina)</span>
-    <input name="plate" autocapitalize="characters" autocomplete="off" placeholder="ABC 123" value="{{ form.plate }}">
+    <input name="plate" autocapitalize="characters" autocomplete="off" maxlength="15" placeholder="ABC 123" value="{{ form.plate }}">
   </label>
   <label class="field"><span>Diena</span>
     <input name="day" type="date" min="{{ today.isoformat() }}" value="{{ form.day }}" required>
@@ -38,7 +38,7 @@
         <div class="small muted">{{ lt.sentence(lt.day_label(booking.day)) }}, {{ booking.start }}–{{ booking.end }} · vieta Nr. {{ booking.space }}{% if booking.ev %} {{ ev_mark() }}{% endif %} · rezervavo {{ booking.host.name }}</div>
       </div>
       <form method="post" action="{{ url_for('admin_cancel', booking_id=booking.id) }}"
-            onsubmit="return confirm('Atšaukti svečio rezervaciją?')">
+            data-confirm="Atšaukti svečio rezervaciją?">
         <input type="hidden" name="next" value="{{ url_for('admin_guests') }}">
         <button class="btn btn-quiet">Atšaukti</button>
       </form>

@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;700;800&display=swap">
 <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
-<body>
+<body data-rendered="{{ rendered_at }}"{% if me %} data-signed-in="1"{% endif %}>
 <main>
   {% if me and not hide_push_nudge %}
   {# Asks for notifications. app.js shows the part this device can act on: turn them on here,

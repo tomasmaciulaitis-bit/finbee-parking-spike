@@ -15,6 +15,13 @@
     sync();
   });
 
+  // A form that asks first keeps its question in data-confirm: plain text, so a name in it
+  // can never become script.
+  document.addEventListener('submit', function (event) {
+    var question = event.target.getAttribute && event.target.getAttribute('data-confirm');
+    if (question && !window.confirm(question)) event.preventDefault();
+  });
+
   // A choice worth keeping, like asking for a Charging Space, stays ticked on this phone.
   document.querySelectorAll('input[type=checkbox][data-remember]').forEach(function (box) {
     var key = 'remember-' + box.dataset.remember;
@@ -280,4 +287,52 @@
     }
   }, { passive: true });
   document.addEventListener('touchcancel', function () { tracking = pulling = false; hide(); }, { passive: true });
+})();
+
+// Offline: the installed app opened with no connection shows the page as it was last loaded
+// (sw.js marks it data-offline), says so, and stops forms that need the server. Once nobody is
+// signed in, the saved pages go, so no one else's bookings stay on this phone.
+(function () {
+  var body = document.body;
+  if (body.dataset.signedIn !== '1' && 'caches' in window) caches.delete('pages-v1').catch(function () {});
+  var rendered = body.dataset.rendered || '';  // 'YYYY-MM-DDTHH:MM', Vilnius time
+  var banner = null;
+  function offline() { return body.dataset.offline === '1' || !navigator.onLine; }
+  function day(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function when() {
+    var date = rendered.slice(0, 10), time = rendered.slice(11, 16), now = new Date();
+    if (date === day(now)) return time;
+    return date === day(new Date(now.getTime() - 864e5)) ? 'vakar ' + time : date + ' ' + time;
+  }
+  function show(note) {
+    var main = document.querySelector('main');
+    if (!main) return;
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.className = 'offline-banner';
+      banner.setAttribute('role', 'status');
+      main.insertBefore(banner, main.firstChild);
+    }
+    banner.innerHTML = '<b></b><span></span>';
+    banner.querySelector('b').textContent = 'Nėra interneto ryšio' + (rendered ? ' – rodoma informacija iš ' + when() : '');
+    banner.querySelector('span').textContent = note || 'Rezervuoti ar atšaukti galėsite, kai ryšys atsiras.';
+  }
+  if (offline()) show();
+  window.addEventListener('offline', function () { show(); });
+  window.addEventListener('online', function () {
+    // Back online: a saved page, or one made more than a minute ago, is fetched fresh.
+    if (body.dataset.offline === '1' || Date.now() - new Date(rendered).getTime() > 60000) {
+      location.replace(location.href.split('#')[0]);
+    } else if (banner) {
+      banner.remove();
+      banner = null;
+    }
+  });
+  document.addEventListener('submit', function (event) {
+    if (!offline()) return;
+    event.preventDefault();
+    event.stopPropagation();  // before any "Atšaukti?" question: nothing can be sent now
+    show('Reikia interneto ryšio – pabandykite, kai ryšys atsiras.');
+    window.scrollTo(0, 0);
+  }, true);
 })();

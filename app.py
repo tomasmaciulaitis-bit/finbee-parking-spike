@@ -57,8 +57,13 @@ MESSAGES = {
     "too_many_tries": "Per daug bandymų – paprašykite naujo kodo.",
     "too_soon": "Kodą ką tik išsiuntėme – palaukite minutę ir bandykite vėl.",
     "bad_phone": "Įrašykite telefono numerį po +370, pvz., 612 34567.",
-    "no_guest": "Įrašykite svečio vardą arba įmonę.",
-    "bad_number": "Įrašykite vietos numerį.",
+    "no_guest": "Įrašykite svečio vardą arba įmonę, iki 80 ženklų.",
+    "bad_number": "Įrašykite vietos numerį, iki 10 ženklų.",
+    "bad_name": "Vardas ir pavardė per ilgi – daugiausia 80 ženklų.",
+    "bad_plate": "Valstybinis numeris per ilgas – daugiausia 12 raidžių ir skaičių.",
+    "locked": "Per daug neteisingų kodų. Pabandykite po valandos.",
+    "too_many_codes": "Šiam adresui išsiųsta per daug kodų. Pabandykite po valandos.",
+    "busy": "Šiuo metu siunčiama per daug kodų. Pabandykite po kelių minučių.",
     "space_exists": "Tokia vieta jau yra.",
     "owned_space": "Nuolatinės vietos ištrinti negalima – pirmiausia padarykite ją bendra.",
     "space_used": "Šioje vietoje jau buvo rezervacijų, todėl jos ištrinti negalima. "
@@ -180,8 +185,10 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
                 for plate in re.split(r"[,;/\n]|\s+ir\s+", value, flags=re.IGNORECASE) if plate.strip()]
 
     def back(default):
+        """Back to a page of this app only. A path made of plain characters can't be read as another
+        site, which "//x", "/\\x" or a tab or line break inside can be."""
         target = request.form.get("next") or ""
-        return redirect(target if target.startswith("/") and not target.startswith("//") else default)
+        return redirect(target if re.fullmatch(r"/(?![/\\])[\w\-./?=&%]*", target) else default)
 
     def is_iphone():
         agent = request.headers.get("User-Agent", "")
@@ -257,7 +264,7 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         return {"me": me, "has_push": bool(me and garage.push_subscriptions(me.id)), "asset": asset,
                 "lt": lt, "day_label_short": day_label_short,
                 "position": position, "vapid_public": vapid_public, "today": now().date(),
-                "now_hhmm": now().strftime("%H:%M")}
+                "now_hhmm": now().strftime("%H:%M"), "rendered_at": now().strftime("%Y-%m-%dT%H:%M")}
 
     # ---- the Home Screen app ---------------------------------------------------------------
 
@@ -274,6 +281,11 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
                        "purpose": "maskable"}]})
         response.mimetype = "application/manifest+json"
         return response
+
+    @app.get("/offline")
+    def offline_page():
+        """What the installed app shows with no connection for a page it hasn't saved yet."""
+        return render_template("offline.html")
 
     @app.get("/sw.js")
     def service_worker():
@@ -507,11 +519,11 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         if request.method == "POST":
             try:
                 garage.set_phone(g.me, phone_from(request.form))
+                garage.set_plates(g.me, plate_list(request.form))
             except Refused as error:
                 refused(error)
                 return render_template("profile.html", phone=request.form.get("phone", ""),
                                        plates=request.form.getlist("plates"))
-            garage.set_plates(g.me, plate_list(request.form))
             flash("Išsaugota.")
             return redirect(url_for("profile"))
         return render_template("profile.html", phone=lt.phone_local(g.me.phone), plates=garage.plates(g.me))

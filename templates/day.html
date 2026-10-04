@@ -16,7 +16,7 @@
         <div>{{ my_booking.start }}–{{ my_booking.end }}{% if my_booking.ev %} · {{ ev_mark() }}{% endif %}</div>
       </div>
       <form method="post" action="{{ url_for('cancel', booking_id=my_booking.id) }}"
-            onsubmit="return confirm('Atšaukti rezervaciją?')">
+            data-confirm="Atšaukti rezervaciją?">
         <input type="hidden" name="next" value="{{ request.path }}">
         <button class="btn btn-danger btn-small">{{ 'Išvažiuoju' if my_booking.day == today and my_booking.start <= now_hhmm else 'Atšaukti' }}</button>
       </form>

@@ -71,6 +71,53 @@ class SignInTest(unittest.TestCase):
         self.signin.request_code("ona@finbeeverslui.lt")
         self.assertEqual((refused.exception.code, len(self.sent)), ("too_soon", 2))
 
+    def test_ten_wrong_codes_in_an_hour_lock_the_address_for_the_hour(self):
+        email = "ona@finbeeverslui.lt"
+        self.garage.register(email, "Ona", [])
+
+        def wrong_tries(n):
+            code = self.code_for(email)
+            for _ in range(n):
+                try:
+                    self.signin.verify(email, "000000" if code != "000000" else "111111")
+                except Refused:
+                    pass
+        self.signin.request_code(email)
+        wrong_tries(5)
+        self.clock.set(date(2026, 10, 5), "10:02")
+        self.signin.request_code(email)
+        wrong_tries(4)
+        right = self.code_for(email)
+        wrong_tries(1)
+        codes = []
+        for attempt in (lambda: self.signin.verify(email, right), lambda: self.signin.request_code(email)):
+            try:
+                attempt()
+            except Refused as error:
+                codes.append(error.code)
+        self.clock.set(date(2026, 10, 5), "11:03")
+        self.signin.request_code(email)
+        self.assertEqual((codes, self.signin.verify(email, self.code_for(email)).name), (["locked", "locked"], "Ona"))
+
+    def test_an_address_gets_at_most_five_codes_an_hour(self):
+        email = "ona@finbeeverslui.lt"
+        for n in range(5):
+            self.clock.set(date(2026, 10, 5), "10:%02d" % (n * 2))
+            self.signin.request_code(email)
+        self.clock.set(date(2026, 10, 5), "10:12")
+        with self.assertRaises(Refused) as refused:
+            self.signin.request_code(email)
+        self.clock.set(date(2026, 10, 5), "11:01")
+        self.signin.request_code(email)
+        self.assertEqual((refused.exception.code, len(self.sent)), ("too_many_codes", 6))
+
+    def test_at_most_forty_codes_an_hour_go_out_in_all(self):
+        for n in range(40):
+            self.signin.request_code("kolega%d@finbeeverslui.lt" % n)
+        with self.assertRaises(Refused) as refused:
+            self.signin.request_code("kolega40@finbeeverslui.lt")
+        self.assertEqual((refused.exception.code, len(self.sent)), ("busy", 40))
+
     def test_a_deactivated_colleague_gets_no_code(self):
         admin = self.garage.register("admin@finbeeverslui.lt", "Admin", [])
         ona = self.garage.register("ona@finbeeverslui.lt", "Ona", [])

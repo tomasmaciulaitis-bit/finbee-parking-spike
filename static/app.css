@@ -381,3 +381,10 @@ nav.tabs a.active svg { stroke-width: 2.2; }
 /* a Charging Space */
 .ev-mark { display: inline-flex; align-items: center; gap: 2px; color: var(--color-ok); font-weight: 600; white-space: nowrap; }
 .ev-mark svg { width: 13px; height: 13px; fill: currentColor; }
+
+/* offline: the page as last loaded, and why nothing can be changed */
+.offline-banner {
+  margin: 10px 0; padding: 12px 16px; border-radius: var(--radius-input); font-size: 14px;
+  background: var(--alert-warning-bg); color: var(--alert-warning-text); border: 1px solid var(--alert-warning-border);
+}
+.offline-banner b { display: block; margin-bottom: 2px; }

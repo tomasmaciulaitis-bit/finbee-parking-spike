@@ -22,7 +22,7 @@
   <legend>Automobilio valstybinis numeris</legend>
   <div class="plate-list">
     {% for plate in (plates or ['']) %}
-    <input name="plates" autocapitalize="characters" autocomplete="off" placeholder="ABC 123" value="{{ plate }}" aria-label="Valstybinis numeris">
+    <input name="plates" autocapitalize="characters" autocomplete="off" maxlength="15" placeholder="ABC 123" value="{{ plate }}" aria-label="Valstybinis numeris">
     {% endfor %}
     <button type="button" class="btn btn-quiet" data-add-plate hidden>+ Pridėti dar vieną numerį</button>
   </div>
@@ -82,7 +82,7 @@
         <span class="muted">{{ held.start }}–{{ held.end }}
           {% if admin %}
             <form class="inline" method="post" action="{{ url_for('admin_cancel', booking_id=held.id) }}"
-                  onsubmit="return confirm('{{ 'Atšaukti svečio rezervaciją?' if held.guest else 'Atšaukti šią rezervaciją? Kolegai bus pranešta.' }}')">
+                  data-confirm="{{ 'Atšaukti svečio rezervaciją?' if held.guest else 'Atšaukti šią rezervaciją? Kolegai bus pranešta.' }}">
               <input type="hidden" name="next" value="{{ next_url }}">
               <button class="btn btn-quiet small">Atšaukti</button>
             </form>

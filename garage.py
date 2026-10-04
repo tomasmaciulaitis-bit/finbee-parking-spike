@@ -126,6 +126,11 @@ def free_gaps(window, taken):
     return [(start, end) for start, end in gaps if start < end]
 
 
+# How long typed text may be: it shows up in other Colleagues' pages and emails.
+MAX_NAME = 80     # a Colleague's or a Guest's name
+MAX_NUMBER = 10   # a Space's number, as painted
+MAX_PLATE = 12    # a Number Plate, its letters and digits
+
 # Columns added after the first version; a garage created before them gets them on opening.
 ADDED_COLUMNS = (("colleagues", "phone", "TEXT"), ("bookings", "guest_name", "TEXT"),
                  ("bookings", "guest_plate", "TEXT"), ("spaces", "ev", "INTEGER NOT NULL DEFAULT 0"),
@@ -380,6 +385,8 @@ class Garage:
         number = normal_phone(phone) if phone is not None else None
         if phone is not None and number is None:
             raise Refused("bad_phone")
+        if len(name.strip()) > MAX_NAME:
+            raise Refused("bad_name")
         email = email.strip().lower()
         with self._lock, self._db:
             cur = self._db.execute(
@@ -428,7 +435,10 @@ class Garage:
             return self._colleague("id", row["id"]) if row else None
 
     def _store_plates(self, colleague_id, plates):
-        for plate in {normal_plate(plate) for plate in plates} - {""}:
+        plates = {normal_plate(plate) for plate in plates} - {""}
+        if any(len(plate) > MAX_PLATE for plate in plates):
+            raise Refused("bad_plate")  # inside the caller's transaction, so nothing is half saved
+        for plate in plates:
             self._db.execute("INSERT INTO plates (colleague_id, plate) VALUES (?, ?)",
                              (colleague_id, plate))
 
@@ -442,7 +452,7 @@ class Garage:
     def _new_number(self, number):
         """A Space number that is given and isn't already another Space's."""
         number = (number or "").strip()
-        if not number:
+        if not number or len(number) > MAX_NUMBER:
             raise Refused("bad_number")
         if self._db.execute("SELECT 1 FROM spaces WHERE number = ?", (number,)).fetchone():
             raise Refused("space_exists")
@@ -707,8 +717,11 @@ class Garage:
         with self._lock, self._db:
             self._require_admin(actor)
             guest = (guest or "").strip()
-            if not guest:
+            if not guest or len(guest) > MAX_NAME:
                 raise Refused("no_guest")
+            plate = normal_plate(plate or "") or None
+            if plate is not None and len(plate) > MAX_PLATE:
+                raise Refused("bad_plate")
             if day < self._now().date():
                 raise Refused("past_day")
             if self._is_closed(day):
@@ -717,7 +730,6 @@ class Garage:
             chosen = choose_space(self._candidates(day), start_min, end_min, ev)
             if chosen is None:
                 raise Refused("no_space")
-            plate = normal_plate(plate or "") or None
             booking_id = self._db.execute(
                 "INSERT INTO bookings (colleague_id, space_id, day, start_min, end_min, guest_name, "
                 "guest_plate, wants_ev) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
