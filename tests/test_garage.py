@@ -935,6 +935,20 @@ class LengthLimitTest(GarageTest):
         self.assertEqual(self.garage.plates(ona), ["ABC123"])
 
 
+class PlateDirectoryTest(GarageTest):
+    def test_the_directory_has_every_active_colleagues_plates_and_upcoming_guest_plates(self):
+        self.spaces("1", "2")
+        self.garage.register("ona@finbeeverslui.lt", "Ona", ["ABC 123", "DEF 456"], phone="861234567")
+        jonas = self.garage.register("jonas@finbeeverslui.lt", "Jonas", ["XYZ 999"], phone="869911223")
+        self.garage.deactivate(self.admin, jonas)
+        self.garage.book_guest(self.admin, TUESDAY, "UAB Klientas", plate="GST 001")
+        self.garage.book_guest(self.admin, TUESDAY, "Be numerio")
+        directory = self.garage.plate_directory()
+        self.assertEqual((directory.colleagues, [(g.plate, g.day, g.guest, g.host.name) for g in directory.guests]),
+                         ({"ABC123": ("Ona", "+37061234567"), "DEF456": ("Ona", "+37061234567")},
+                          [("GST001", TUESDAY, "UAB Klientas", "Admin")]))
+
+
 class ClosedDayTest(GarageTest):
     def test_weekends_and_days_an_admin_closed_cannot_be_booked(self):
         self.spaces("12")

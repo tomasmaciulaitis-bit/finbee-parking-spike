@@ -275,6 +275,19 @@ class AppTest(unittest.TestCase):
         response = client.post("/profilis", data={"phone": "612 34567", "plates": ["X" * 13]})
         self.assertEqual((response.status_code, "per ilgas" in response.get_data(as_text=True)), (200, True))
 
+    def test_the_plate_list_for_offline_search_is_only_for_signed_in_colleagues(self):
+        self.garage.register("jonas@finbeeverslui.lt", "Jonas", ["KLM 456"], phone="8 699 11223")
+        signed_out = self.app.test_client().get("/api/numeriai")
+        response = self.signed_in("ona@finbeeverslui.lt", name="Ona").get("/api/numeriai")
+        listed = response.get_json()
+        self.assertEqual((signed_out.status_code, listed["colleagues"]["KLM456"], listed["made"],
+                          response.headers.get("Cache-Control")),
+                         (302, {"name": "Jonas", "phone": "+37069911223"}, "2026-10-05T10:00", "no-store"))
+
+    def test_the_plate_search_form_says_which_day_it_is_for(self):
+        page = self.signed_in("ona@finbeeverslui.lt", name="Ona").get("/diena/2026-10-06").get_data(as_text=True)
+        self.assertIn('data-plate-search data-day="2026-10-06"', page)
+
     def test_a_form_posted_from_another_site_is_refused(self):
         client = self.signed_in("ona@finbeeverslui.lt", name="Ona")
         response = client.post("/rezervuoti", data={"day": "2026-10-06", "kind": "whole"},

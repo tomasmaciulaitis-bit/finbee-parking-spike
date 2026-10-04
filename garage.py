@@ -285,6 +285,13 @@ class GuestBooking:
 
 
 @dataclass(frozen=True)
+class PlateDirectory:
+    """What a phone keeps to look Number Plates up with no connection (ADR-0007)."""
+    colleagues: dict  # Number Plate -> (name, Phone Number) for every active Colleague
+    guests: list      # [GuestBooking] from today on that name a Number Plate
+
+
+@dataclass(frozen=True)
 class SpaceDay:
     number: str
     owner: object        # the Owner's name for an Owned Space, else None
@@ -431,8 +438,25 @@ class Garage:
         with self._lock:
             row = self._db.execute(
                 "SELECT c.id FROM plates p JOIN colleagues c ON c.id = p.colleague_id "
-                "WHERE p.plate = ? AND c.active = 1", (normal_plate(plate),)).fetchone()
+                "WHERE p.plate = ? AND c.active = 1 ORDER BY c.id", (normal_plate(plate),)).fetchone()
             return self._colleague("id", row["id"]) if row else None
+
+    def plate_directory(self):
+        """Every Number Plate a search could find, for a phone to keep: each active Colleague's,
+        and the Guest Bookings' from today on. Where two Colleagues share a plate, the first
+        registered answers, as whose_plate does."""
+        with self._lock:
+            colleagues = {}
+            for row in self._db.execute(
+                    "SELECT p.plate, c.name, c.phone FROM plates p JOIN colleagues c ON c.id = p.colleague_id "
+                    "WHERE c.active = 1 ORDER BY c.id"):
+                colleagues.setdefault(row["plate"], (row["name"], row["phone"]))
+            today, now_min = self._today()
+            guests = [self._guest_booking(row) for row in self._db.execute(
+                "SELECT b.*, s.number, s.ev FROM bookings b JOIN spaces s ON s.id = b.space_id "
+                "WHERE b.guest_plate IS NOT NULL AND (b.day > :today OR (b.day = :today AND b.end_min > :now)) "
+                "ORDER BY b.day, b.start_min", {"today": today, "now": now_min}).fetchall()]
+            return PlateDirectory(colleagues, guests)
 
     def _store_plates(self, colleague_id, plates):
         plates = {normal_plate(plate) for plate in plates} - {""}

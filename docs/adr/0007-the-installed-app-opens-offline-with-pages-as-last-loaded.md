@@ -11,5 +11,11 @@ Nothing changes offline. Booking, cancelling, leaving and joining the Waitlist n
 which decides everything, so offline the forms say a connection is needed instead of failing.
 A page always comes from the server when it can, so a saved copy never hides a newer one.
 
-The saved pages hold the Colleague's own bookings and the Day View's names, so they're deleted
+"Kieno automobilis?" works offline too. Each phone keeps a list of every active Colleague's
+Number Plates with their name and Phone Number, plus the Guest Bookings from today on that name
+a plate, refreshed at most every half hour while online. Searching offline answers from that list
+and says so. Tomas chose everyone's numbers (2026-10-04) over only the cars expected in the garage,
+knowing it puts the whole staff list on every phone. Online, the server still answers each search.
+
+The saved pages and the plate list hold other Colleagues' names and numbers, so they're deleted
 as soon as nobody is signed in on that phone, at sign-out or when a session ends.

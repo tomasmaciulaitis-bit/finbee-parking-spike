@@ -81,7 +81,8 @@ The registration number of a car a Colleague drives; a Colleague may have severa
 change them later. The garage entrance has a camera that admits cars by Number Plate, but
 the app has nothing to do with it: in the app a Number Plate only tells people whose car
 is whose. Any Colleague can look up whose car a Number Plate belongs to, and sees the
-driver's Phone Number to call them. Each Number Plate is typed in its own field, so two never
+driver's Phone Number to call them; with no connection, the phone answers from the list of every
+Colleague's plates it keeps (ADR-0007). Each Number Plate is typed in its own field, so two never
 run together into one.
 _LT_: valstybinis numeris
 _Avoid_: licence plate, car registration (collides with Registration), vehicle

@@ -282,6 +282,21 @@ def create_app(data_dir, now=vilnius_now, first_admin_email=None, send_code=None
         response.mimetype = "application/manifest+json"
         return response
 
+    @app.get("/api/numeriai")
+    @signed_in
+    def plates_to_keep():
+        """Every plate "Kieno automobilis?" could find, with its driver's name and number: the
+        phone keeps it to search with no connection (ADR-0007). Tomas chose everyone's."""
+        directory = garage.plate_directory()
+        response = jsonify(
+            made=now().strftime("%Y-%m-%dT%H:%M"),
+            colleagues={plate: {"name": name, "phone": phone}
+                        for plate, (name, phone) in directory.colleagues.items()},
+            guests=[{"plate": g.plate, "day": g.day.isoformat(), "guest": g.guest, "host": g.host.name,
+                     "phone": g.host.phone} for g in directory.guests])
+        response.headers["Cache-Control"] = "no-store"  # only sw.js keeps it, and drops it at sign-out
+        return response
+
     @app.get("/offline")
     def offline_page():
         """What the installed app shows with no connection for a page it hasn't saved yet."""

@@ -329,10 +329,85 @@
     }
   });
   document.addEventListener('submit', function (event) {
-    if (!offline()) return;
+    if (!offline() || event.target.hasAttribute('data-plate-search')) return;  // that one searches the saved list
     event.preventDefault();
     event.stopPropagation();  // before any "Atšaukti?" question: nothing can be sent now
     show('Reikia interneto ryšio – pabandykite, kai ryšys atsiras.');
     window.scrollTo(0, 0);
   }, true);
+})();
+
+// "Kieno automobilis?" with no connection: the phone keeps every plate with its driver's name and
+// number (/api/numeriai, saved by sw.js and gone at sign-out with the pages), refreshed at most
+// every half hour while online, and answers from it offline. Names only ever go in as text.
+(function () {
+  var form = document.querySelector('form[data-plate-search]');
+  if (!form) return;
+  var REFRESH = 30 * 60 * 1000;
+  function online() { return navigator.onLine && document.body.dataset.offline !== '1'; }
+  // Only through sw.js is the list saved, so only while it controls the page (on the very first
+  // visit, once it takes over); and at once whenever no copy is saved yet, whatever the clock says.
+  function refresh() {
+    if (!online() || !navigator.serviceWorker || !navigator.serviceWorker.controller || !('caches' in window)) return;
+    caches.match('/api/numeriai').then(function (savedCopy) {
+      var last = 0;
+      try { last = Number(localStorage.getItem('plateListAt')) || 0; } catch (e) {}
+      if (savedCopy && Date.now() - last < REFRESH) return;
+      return fetch('/api/numeriai').then(function (response) {
+        if (response.ok) { try { localStorage.setItem('plateListAt', String(Date.now())); } catch (e) {} }
+      });
+    }).catch(function () {});
+  }
+  refresh();
+  if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('controllerchange', refresh);
+  function normal(text) { return text.toUpperCase().replace(/[^\p{L}\p{N}]/gu, ''); }  // as normal_plate
+  function phoneLabel(number) {
+    return /^\+370\d{8}$/.test(number) ? number.slice(0, 4) + ' ' + number.slice(4, 7) + ' ' + number.slice(7) : number;
+  }
+  function node(tag, className, text) {
+    var el = document.createElement(tag);
+    if (className) el.className = className;
+    if (text) el.textContent = text;
+    return el;
+  }
+  function callButton(number) {
+    var link = node('a', 'btn btn-primary call');
+    link.href = 'tel:' + number;
+    link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 3.5h3l1.5 4-2 1.5a11 11 0 0 0 7 7l1.5-2 4 1.5v3a2 2 0 0 1-2 2A17 17 0 0 1 3.5 5.5a2 2 0 0 1 2-2z"/></svg>';
+    link.appendChild(document.createTextNode(phoneLabel(number)));
+    return link;
+  }
+  function show(parts) {
+    form.querySelectorAll('.plate-owner, .plate-none').forEach(function (old) { old.remove(); });
+    var box = node('div', 'plate-owner');
+    parts.forEach(function (part) { if (part) box.appendChild(part); });
+    form.appendChild(box);
+  }
+  form.addEventListener('submit', function (event) {
+    if (online()) return;  // the server answers, as always
+    event.preventDefault();
+    var plate = normal(form.elements.numeris.value);
+    if (!plate) return;
+    fetch('/api/numeriai').then(function (response) { return response.ok ? response.json() : null; })
+      .catch(function () { return null; })
+      .then(function (list) {
+        if (!list) {
+          show([node('p', 'muted', 'Be ryšio ieškoti dar negalima: sąrašas išsaugomas, kai programėlę atidarote su ryšiu.')]);
+          return;
+        }
+        var saved = node('span', 'small muted', 'Ieškota telefone išsaugotame sąraše (' + String(list.made || '').replace('T', ' ') + ').');
+        var who = list.colleagues[plate];
+        if (who) {
+          show([node('b', '', who.name), who.phone ? callButton(who.phone) : node('span', 'small muted', 'Telefono numerio dar nepateikė.'), saved]);
+          return;
+        }
+        var guest = (list.guests || []).filter(function (g) { return g.plate === plate && g.day === form.dataset.day; })[0];
+        if (guest) {
+          show([node('b', '', 'Svečias – ' + guest.guest), node('span', 'small muted', 'Vietą svečiui rezervavo ' + guest.host + '.'),
+                guest.phone ? callButton(guest.phone) : null, saved]);
+          return;
+        }
+        show([node('p', 'muted', 'Tokio numerio nėra.'), saved]);
+      });
+  });
 })();

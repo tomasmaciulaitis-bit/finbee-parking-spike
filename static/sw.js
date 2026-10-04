@@ -26,8 +26,27 @@ self.addEventListener('fetch', function (event) {
     event.respondWith(openPage(request, url));
   } else if (url.pathname.indexOf('/static/') === 0 && url.searchParams.has('v')) {
     event.respondWith(staticFile(request, url));
+  } else if (url.pathname === '/api/numeriai') {
+    event.respondWith(plateList(request));
   }
 });
+
+// The plate list for "Kieno automobilis?" with no connection: fresh whenever possible and saved
+// with the pages (so it goes at sign-out too), else the copy saved last time.
+function plateList(request) {
+  return fetch(request).then(function (response) {
+    if (response.status !== 200 || (response.headers.get('Content-Type') || '').indexOf('application/json') < 0) {
+      throw new Error('no list');  // e.g. signed out: the sign-in page is never saved as the list
+    }
+    var copy = response.clone();
+    caches.open(PAGES).then(function (cache) { return cache.put('/api/numeriai', copy); });
+    return response;
+  }).catch(function () {
+    return caches.open(PAGES).then(function (cache) { return cache.match('/api/numeriai'); }).then(function (saved) {
+      return saved || new Response('null', { status: 503, headers: { 'Content-Type': 'application/json' } });
+    });
+  });
+}
 
 // A page comes fresh from the server whenever it can, and is saved. With no connection, or
 // while the server is down (a deploy), the saved copy is marked so the page says it may be old.

@@ -84,7 +84,7 @@
   {% else %}<p class="muted">Šią dieną rezervuoti vietų nėra.</p>{% endfor %}
 </div>
 
-<form class="card" method="get" action="{{ request.path }}">
+<form class="card" method="get" action="{{ request.path }}" data-plate-search data-day="{{ day.isoformat() }}">
   <h2>Kieno automobilis?</h2>
   <div class="row">
     <input name="numeris" autocapitalize="characters" placeholder="ABC 123" value="{{ plate }}">
@@ -105,7 +105,7 @@
       {% if plate_guest.host.phone %}{{ call_button(plate_guest.host.phone) }}{% endif %}
     </div>
     {% else %}
-    <p class="muted">Tokio numerio nėra.</p>
+    <p class="muted plate-none">Tokio numerio nėra.</p>
     {% endif %}
   {% endif %}
 </form>
